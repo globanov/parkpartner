@@ -19,7 +19,7 @@ flowchart
 
     subgraph External["🔌 External APIs"]
         Whisper[👂 Groq Whisper STT]
-        LLM[🧠 Qwen LLM DashScope]
+        LLM[🧠 Qwen LLM - DashScope]
         TTS[🗣️ Edge TTS Free]
     end
 
@@ -32,7 +32,8 @@ flowchart
     API <-->|audio| TTS
     Browser --> Speaker
 
-    style Client fill:#1e3a5f,stroke:#4a9eff,stroke-width:2px,color:#fff
-    style Tunnel fill:#2d5016,stroke:#7ec850,stroke-width:2px,color:#fff
-    style Server fill:#50162d,stroke:#c8507e,stroke-width:2px,color:#fff
-    style External fill:#4a3c16,stroke:#d4af37,stroke-width:2px,color:#fff
+    style Client fill:#5B8DBE,stroke:#2E4A6B,stroke-width:2px,color:#FFFFFF
+    style Tunnel fill:#7DBE7D,stroke:#3A5F3A,stroke-width:2px,color:#FFFFFF
+    style Server fill:#BE6B8A,stroke:#6B3A4A,stroke-width:2px,color:#FFFFFF
+    style External fill:#D4AF5A,stroke:#7A6B2E,stroke-width:2px,color:#000000
+```
