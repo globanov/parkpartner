@@ -29,3 +29,6 @@ models/
 *.webm
 *.mp3
 tmp/
+
+# Log
+parkpartner.log
