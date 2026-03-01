@@ -18,9 +18,9 @@ flowchart
     end
 
     subgraph External["🔌 External APIs"]
-        Whisper[👂 Groq Whisper STT]
-        LLM[🧠 Qwen LLM - DashScope]
-        TTS[🗣️ Edge TTS Free]
+        Whisper[👂 STT - Whisper]
+        LLM[🧠 LLM - Qwen/DashScope]
+        TTS[🗣️ TTS - Edge TTS]
     end
 
     Mic --> Browser
