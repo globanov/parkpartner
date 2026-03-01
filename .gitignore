@@ -1,5 +1,5 @@
 # Virtual env
-*venv*
+.venv/
 
 # API keys and secrets
 .env
@@ -8,6 +8,7 @@
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 
 # IDE
 .idea/
@@ -17,3 +18,14 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Whisper models
+*.bin
+*.pt
+models/
+
+# Audio files (temp)
+*.wav
+*.webm
+*.mp3
+tmp/
