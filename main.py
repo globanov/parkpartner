@@ -4,46 +4,51 @@ import traceback
 import whisper
 import edge_tts
 import asyncio
+import requests
 from contextlib import asynccontextmanager
 from typing import Dict, List, Any
+from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Header, UploadFile, File
+from fastapi import FastAPI, HTTPException, Header, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
-from openai import OpenAI
 import tempfile
 
 load_dotenv()
 
 # Config
 SECRET_TOKEN = os.getenv("SECRET_TOKEN")
-DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
-DASHSCOPE_BASE_URL = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
 WHISPER_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "ru")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 
-logging.basicConfig(level=logging.INFO)
+# Logging setup
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("parkpartner.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
-class AppState:
-    """Type hints for app.state"""
-    whisper_model: Any
-    llm_client: OpenAI
-    session_histories: Dict[str, List[dict]]
+# Global variables
+whisper_model: Any = None
+session_histories: Dict[str, List[dict]] = {}
 
 @asynccontextmanager
-async def lifespan(app_l: FastAPI):
+async def lifespan(app: FastAPI):
+    global whisper_model, session_histories
+
     logger.info("🚀 ParkPartner starting up...")
     logger.info(f"⏳ Loading Whisper model '{WHISPER_MODEL}'...")
-    app_l.state.whisper_model = whisper.load_model(WHISPER_MODEL) # type: ignore
+    whisper_model = whisper.load_model(WHISPER_MODEL)
     logger.info("✅ Whisper loaded")
 
-    app_l.state.llm_client = OpenAI( # type: ignore
-        api_key=DASHSCOPE_API_KEY,
-        base_url=DASHSCOPE_BASE_URL
-    ) # type: ignore
-    app_l.state.session_histories: Dict[str, List[dict]] = {} # type: ignore
+    session_histories = {}
 
     yield
     logger.info("🛑 ParkPartner shutting down...")
@@ -52,7 +57,12 @@ app = FastAPI(title="ParkPartner", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,76 +80,146 @@ def check_token(authorization: str | None = Header(default=None)):
 async def health():
     return {"status": "ok", "version": "0.1.0"}
 
+def call_ollama(messages: list, model: str = None) -> str:
+    """Call local Ollama LLM"""
+    if model is None:
+        model = OLLAMA_MODEL
+
+    try:
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/chat",
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 150
+                }
+            },
+            timeout=30
+        )
+        response.raise_for_status()
+        return response.json()["message"]["content"].strip()
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="LLM service timed out")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Ollama error: {e}")
+        raise HTTPException(status_code=502, detail="LLM service unavailable")
+
+def cleanup_files(*paths):
+    """Safely delete temporary files"""
+    for path in paths:
+        if path and os.path.exists(path):
+            try:
+                os.unlink(path)
+                logger.debug(f"🗑️ Deleted: {path}")
+            except Exception as e:
+                logger.warning(f"Could not delete {path}: {e}")
+
 @app.post("/process")
 async def process_audio(
         file: UploadFile = File(...),
-        authorization: str | None = Header(default=None)
+        authorization: str | None = Header(default=None),
+        background_tasks: BackgroundTasks = None
 ):
+    global session_histories
+
     token = check_token(authorization)
     session_id = token
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    logger.info(f"🔔 [{ts}] Request session={session_id[:8]}")
+
+    # Validate content type
     if file.content_type not in ["audio/webm", "audio/mp4", "audio/wav", "audio/mpeg"]:
+        logger.warning(f"❌ Unsupported format: {file.content_type}")
         raise HTTPException(status_code=400, detail="Unsupported audio format")
 
-    logger.info(f"📥 Received audio from session {session_id[:8]}...")
+    # Read audio
+    audio_data = await file.read()
+    logger.debug(f"📥 [{ts}] Received {len(audio_data)} bytes, type={file.content_type}")
 
-    if session_id not in app.state.session_histories: # type: ignore
-        app.state.session_histories[session_id] = [] # type: ignore
-    history = app.state.session_histories[session_id] # type: ignore
+    if session_id not in session_histories:
+        session_histories[session_id] = []
+    history = session_histories[session_id]
 
     tmp_path = None
     tts_path = None
 
     try:
+        # 1. Save input to temp file for Whisper
         with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
-            tmp.write(await file.read())
+            tmp.write(audio_data)
             tmp_path = tmp.name
+        logger.debug(f"💾 Temp input: {tmp_path}")
 
+        # 2. STT: Whisper
         logger.info("🎤 Transcribing...")
-        result = app.state.whisper_model.transcribe(tmp_path, language=WHISPER_LANGUAGE) # type: ignore
+        result = whisper_model.transcribe(tmp_path, language=WHISPER_LANGUAGE)  # type: ignore
         user_text = result["text"].strip()
-        logger.info(f"🗣️ User: {user_text}")
+        logger.info(f"🗣️ User: '{user_text}'")
+        logger.debug(f"📝 Transcription raw: {result}")
 
         if not user_text:
+            logger.warning("⚠️ No speech detected")
             raise HTTPException(status_code=400, detail="No speech detected")
 
+        # 3. LLM: Ollama
         logger.info("🧠 Generating response...")
         history.append({"role": "user", "content": user_text})
 
-        response = app.state.llm_client.chat.completions.create( # type: ignore
-            model="qwen-turbo",
-            messages=[
-                {"role": "system", "content": "Ты дружелюбный помощник для прогулок в парке. Отвечай кратко (1-3 предложения)."},
-                *history[-6:]
-            ],
-            max_tokens=150
-        )
-        assistant_text = response.choices[0].message.content.strip()
-        logger.info(f"🤖 Assistant: {assistant_text}")
+        messages = [
+            {"role": "system", "content": "Ты дружелюбный помощник для прогулок в парке. Отвечай кратко (1-3 предложения)."},
+            *history[-6:]
+        ]
+        assistant_text = call_ollama(messages)
+        logger.info(f"🤖 Assistant: '{assistant_text}'")
 
         history.append({"role": "assistant", "content": assistant_text})
         history[:] = history[-6:]
 
+        # 4. TTS: Edge TTS
         logger.info("🗣️ Synthesizing speech...")
         tts_path = tmp_path + ".mp3"
-        communicate = edge_tts.Communicate(assistant_text, "ru-RU-DmitryNeural")
-        await asyncio.wait_for(communicate.save(tts_path), timeout=15.0)
+        logger.debug(f"💾 Temp TTS output: {tts_path}")
 
+        try:
+            communicate = edge_tts.Communicate(assistant_text, "ru-RU-DmitryNeural")
+            await asyncio.wait_for(communicate.save(tts_path), timeout=20.0)
+
+            if not os.path.exists(tts_path):
+                raise RuntimeError(f"TTS file not created: {tts_path}")
+
+            file_size = os.path.getsize(tts_path)
+            logger.info(f"✅ TTS saved: {tts_path} ({file_size} bytes)")
+
+        except asyncio.TimeoutError:
+            logger.error("⏰ TTS timeout")
+            raise HTTPException(status_code=504, detail="TTS service timed out")
+        except Exception as e:
+            logger.error(f"❌ TTS error: {e}\n{traceback.format_exc()}")
+            raise HTTPException(status_code=502, detail=f"TTS failed: {str(e)}")
+
+        # 5. Schedule cleanup AFTER response is sent
+        if background_tasks:
+            background_tasks.add_task(cleanup_files, tmp_path, tts_path)
+            logger.debug(f"🧹 Cleanup scheduled for: {tmp_path}, {tts_path}")
+
+        # 6. Final debug summary
+        logger.info(f"🎧 [{ts}] Session {session_id[:8]}: '{user_text}' → '{assistant_text}' | TTS: {tts_path}")
+
+        # 7. Return audio
         return FileResponse(tts_path, media_type="audio/mpeg", filename="response.mp3")
 
-    except asyncio.TimeoutError:
-        logger.error("⏰ TTS timeout")
-        raise HTTPException(status_code=504, detail="TTS service timed out")
+    except HTTPException:
+        logger.warning("⚠️ HTTPException, cleaning up...")
+        cleanup_files(tmp_path, tts_path)
+        raise
     except Exception as e:
-        logger.error(f"❌ Error: {e}\n{traceback.format_exc()}")
+        logger.error(f"❌ Unexpected error: {e}\n{traceback.format_exc()}")
+        cleanup_files(tmp_path, tts_path)
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        for path in [tmp_path, tts_path]:
-            if path and os.path.exists(path):
-                try:
-                    os.unlink(path)
-                except Exception as e:
-                    logger.warning(f"Could not delete {path}: {e}")
 
 if __name__ == "__main__":
     import uvicorn
