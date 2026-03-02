@@ -153,7 +153,7 @@
 
 <script>
     // Config - update with your ngrok URL later
-    const API_URL = 'http://localhost:8000';
+    const API_URL = '';
     const SECRET_TOKEN = 'moi_secret_123';
 
     const recordBtn = document.getElementById('recordBtn');
@@ -215,7 +215,7 @@
             const formData = new FormData();
             formData.append('file', audioBlob, 'recording.webm');
 
-            const response = await fetch(`${API_URL}/process`, {
+            const response = await fetch('/process', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${SECRET_TOKEN}`
