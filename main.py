@@ -11,7 +11,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Header, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse,  HTMLResponse
 from dotenv import load_dotenv
 import tempfile
 
@@ -35,6 +35,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+class LogMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        logger.info(f"🔍 Request: {request.method} {request.url.path} from {request.client.host}")
+        response = await call_next(request)
+        logger.info(f"✅ Response: {response.status_code} for {request.method} {request.url.path}")
+        return response
+
 # Global variables
 whisper_model: Any = None
 session_histories: Dict[str, List[dict]] = {}
@@ -54,15 +64,14 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 ParkPartner shutting down...")
 
 app = FastAPI(title="ParkPartner", version="0.1.0", lifespan=lifespan)
+app.add_middleware(LogMiddleware)
 
+
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -79,6 +88,11 @@ def check_token(authorization: str | None = Header(default=None)):
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "0.1.0"}
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_frontend():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 def call_ollama(messages: list, model: str = None) -> str:
     """Call local Ollama LLM"""
