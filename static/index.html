@@ -7,12 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>ParkPartner 🎙️</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
@@ -24,114 +19,44 @@
             justify-content: center;
             padding: 20px;
         }
-
-        .container {
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-
-        h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            color: #888;
-            margin-bottom: 30px;
-        }
-
+        .container { width: 100%; max-width: 400px; text-align: center; }
+        h1 { font-size: 28px; margin-bottom: 10px; }
+        .subtitle { color: #888; margin-bottom: 30px; }
         .record-btn {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            border: none;
+            width: 120px; height: 120px; border-radius: 50%; border: none;
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 20px auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            color: white; font-size: 16px; font-weight: bold; cursor: pointer;
+            margin: 20px auto; display: flex; align-items: center; justify-content: center;
             box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
             transition: transform 0.2s, box-shadow 0.2s;
         }
-
-        .record-btn:active {
-            transform: scale(0.95);
-        }
-
+        .record-btn:active { transform: scale(0.95); }
         .record-btn.recording {
             background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
             animation: pulse 1s infinite;
         }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         .status {
-            margin-top: 20px;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            min-height: 60px;
+            margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px; min-height: 60px;
         }
-
-        .status.error {
-            background: rgba(231, 76, 60, 0.2);
-            border: 1px solid #e74c3c;
-        }
-
-        .status.success {
-            background: rgba(46, 204, 113, 0.2);
-            border: 1px solid #2ecc71;
-        }
-
-        .conversation {
-            margin-top: 20px;
-            text-align: left;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .message {
-            padding: 10px 15px;
-            margin: 10px 0;
-            border-radius: 15px;
-            max-width: 80%;
-        }
-
-        .message.user {
-            background: #3498db;
-            margin-left: auto;
-        }
-
-        .message.assistant {
-            background: #2ecc71;
-        }
-
-        .icon {
-            font-size: 24px;
-            margin-bottom: 5px;
-        }
-
+        .status.error { background: rgba(231, 76, 60, 0.2); border: 1px solid #e74c3c; }
+        .status.success { background: rgba(46, 204, 113, 0.2); border: 1px solid #2ecc71; }
+        .conversation { margin-top: 20px; text-align: left; max-height: 300px; overflow-y: auto; }
+        .message { padding: 10px 15px; margin: 10px 0; border-radius: 15px; max-width: 80%; }
+        .message.user { background: #3498db; margin-left: auto; }
+        .message.assistant { background: #2ecc71; }
+        .icon { font-size: 24px; margin-bottom: 5px; }
         .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s linear infinite;
+            display: inline-block; width: 20px; height: 20px;
+            border: 3px solid rgba(255,255,255,0.3); border-radius: 50%;
+            border-top-color: #fff; animation: spin 1s linear infinite;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .play-btn {
+            background: #2ecc71; color: #fff; border: none; padding: 10px 20px;
+            border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px;
         }
     </style>
 </head>
@@ -139,87 +64,84 @@
 <div class="container">
     <h1>ParkPartner 🎙️</h1>
     <p class="subtitle">Your AI walking companion</p>
-
     <button class="record-btn" id="recordBtn">
         <span class="icon">🎤</span><br>Hold to Talk
     </button>
-
-    <div class="status" id="status">
-        Ready to record
-    </div>
-
+    <div class="status" id="status">Ready to record</div>
     <div class="conversation" id="conversation"></div>
 </div>
 
 <script>
-    // Config - update with your ngrok URL later
-    const API_URL = '';
     const SECRET_TOKEN = 'moi_secret_123';
-
     const recordBtn = document.getElementById('recordBtn');
     const status = document.getElementById('status');
     const conversation = document.getElementById('conversation');
-
-    let mediaRecorder;
+    let mediaRecorder = null;
     let audioChunks = [];
     let isRecording = false;
 
-    // Request microphone permission
-    async function initMicrophone() {
+    // iOS fix: create new stream for EACH recording
+    async function startRecording() {
+        audioChunks = [];
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorder = new MediaRecorder(stream);
 
-            mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    audioChunks.push(e.data);
+                }
             };
 
-            mediaRecorder.onstop = sendAudio;
+            mediaRecorder.onstop = () => {
+                // Release microphone after recording
+                stream.getTracks().forEach(track => track.stop());
+                sendAudio();
+            };
 
-            status.textContent = '🎤 Ready to record';
+            mediaRecorder.start();
+            isRecording = true;
+            recordBtn.classList.add('recording');
+            recordBtn.innerHTML = '<span class="icon">🔴</span><br>Recording...';
+            status.textContent = '🔴 Recording...';
+            status.className = 'status';
         } catch (err) {
-            status.textContent = '❌ Microphone access denied';
+            status.textContent = '❌ Mic error: ' + err.message;
             status.className = 'status error';
             console.error('Microphone error:', err);
         }
     }
 
-    // Start recording
-    function startRecording() {
-        audioChunks = [];
-        mediaRecorder.start();
-        isRecording = true;
-        recordBtn.classList.add('recording');
-        recordBtn.innerHTML = '<span class="icon">🔴</span><br>Recording...';
-        status.textContent = '🔴 Recording...';
-        status.className = 'status';
-    }
-
-    // Stop recording
     function stopRecording() {
-        mediaRecorder.stop();
-        isRecording = false;
-        recordBtn.classList.remove('recording');
-        recordBtn.innerHTML = '<span class="icon">🎤</span><br>Hold to Talk';
-        status.textContent = '⏳ Processing...';
-        status.className = 'status';
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+            recordBtn.classList.remove('recording');
+            recordBtn.innerHTML = '<span class="icon">🎤</span><br>Hold to Talk';
+            status.textContent = '⏳ Processing...';
+            status.className = 'status';
+        }
     }
 
-    // Send audio to backend
     async function sendAudio() {
+        // iOS fix: check if we have audio data
+        if (audioChunks.length === 0) {
+            status.textContent = '❌ No audio recorded - try again';
+            status.className = 'status error';
+            return;
+        }
+
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
 
         try {
             status.innerHTML = '<span class="spinner"></span> Processing...';
-
             const formData = new FormData();
             formData.append('file', audioBlob, 'recording.webm');
 
             const response = await fetch('/process', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${SECRET_TOKEN}`
-                },
+                headers: { 'Authorization': `Bearer ${SECRET_TOKEN}` },
                 body: formData
             });
 
@@ -231,22 +153,8 @@
             const audioBlobResponse = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlobResponse);
 
-            // Add user message to conversation
             addMessage('user', '🎤 Voice message sent');
-
-            // Play response
-            const audio = new Audio(audioUrl);
-            audio.play();
-
-            status.textContent = '✅ Response playing...';
-            status.className = 'status success';
-
-            audio.onended = () => {
-                status.textContent = '🎤 Ready to record';
-                status.className = 'status';
-                addMessage('assistant', '🔊 Audio response played');
-            };
-
+            playAudioResponse(audioUrl);
         } catch (err) {
             status.textContent = `❌ Error: ${err.message}`;
             status.className = 'status error';
@@ -254,7 +162,40 @@
         }
     }
 
-    // Add message to conversation
+    // iOS-compatible audio playback
+    function playAudioResponse(audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.preload = 'auto';
+        audio.playsInline = true;
+
+        const tryPlay = () => {
+            audio.play()
+                .then(() => {
+                    status.textContent = '✅ Response playing...';
+                    status.className = 'status success';
+                })
+                .catch(err => {
+                    console.log('Autoplay blocked:', err);
+                    status.innerHTML = `🔊 Response ready<br><button class="play-btn" id="playBtn">▶️ Play</button>`;
+                    status.className = 'status success';
+                    document.getElementById('playBtn').onclick = () => {
+                        audio.play();
+                        status.textContent = '✅ Playing...';
+                    };
+                });
+        };
+
+        tryPlay();
+
+        audio.onended = () => {
+            if (!status.innerHTML.includes('play-btn')) {
+                status.textContent = '🎤 Ready to record';
+                status.className = 'status';
+            }
+            addMessage('assistant', '🔊 Audio response played');
+        };
+    }
+
     function addMessage(role, text) {
         const msg = document.createElement('div');
         msg.className = `message ${role}`;
@@ -266,21 +207,9 @@
     // Event listeners
     recordBtn.addEventListener('mousedown', startRecording);
     recordBtn.addEventListener('mouseup', stopRecording);
-    recordBtn.addEventListener('mouseleave', () => {
-        if (isRecording) stopRecording();
-    });
-
-    recordBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        startRecording();
-    });
-    recordBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        stopRecording();
-    });
-
-    // Initialize on load
-    initMicrophone();
+    recordBtn.addEventListener('mouseleave', () => { if (isRecording) stopRecording(); });
+    recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+    recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
 </script>
 </body>
 </html>

@@ -170,7 +170,10 @@ async def process_audio(
 
         # 2. STT: Whisper
         logger.info("🎤 Transcribing...")
-        result = whisper_model.transcribe(tmp_path, language=WHISPER_LANGUAGE)  # type: ignore
+        result = await asyncio.wait_for(
+            asyncio.to_thread(whisper_model.transcribe, tmp_path, language=WHISPER_LANGUAGE),
+            timeout=30
+        )  # type: ignore
         user_text = result["text"].strip()
         logger.info(f"🗣️ User: '{user_text}'")
         logger.debug(f"📝 Transcription raw: {result}")
