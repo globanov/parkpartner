@@ -1,0 +1,27 @@
+line-length = 88
+target-version = "py311"
+
+[lint]
+select = [
+    "E",   # Pycodestyle errors
+    "F",   # Pyflakes
+    "W",   # Pycodestyle warnings
+    "I",   # Import sorting
+    "N",   # PEP8 naming
+    "UP",  # Pyupgrade
+    "B",   # Bugbear
+    "PL",  # Pylint-compatible rules
+    "C90", # McCabe complexity
+]
+ignore = []
+fixable = ["ALL"]
+unfixable = []
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
