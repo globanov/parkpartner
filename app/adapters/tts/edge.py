@@ -1,10 +1,16 @@
-import edge_tts
 import asyncio
 import os
 
+import edge_tts
+
+from app.config import TTS_TIMEOUT
+
 
 async def synthesize_speech(
-    text: str, voice: str, output_path: str, timeout: int = 20
+    text: str,
+    voice: str,
+    output_path: str,
+    timeout: int = TTS_TIMEOUT,
 ) -> str:
     communicate = edge_tts.Communicate(text, voice)
     await asyncio.wait_for(communicate.save(output_path), timeout=timeout)

@@ -1,6 +1,5 @@
 import logging
 from contextlib import asynccontextmanager
-from typing import Dict, List, Any
 
 import whisper
 from fastapi import FastAPI
@@ -10,8 +9,7 @@ from starlette.requests import Request
 
 from app.adapters.api.routes import router
 from app.config import WHISPER_MODEL
-
-from app.core.state import whisper_model, session_histories
+from app.core.state import set_session_histories, set_whisper_model
 
 # Logging setup
 logging.basicConfig(
@@ -27,29 +25,26 @@ logger = logging.getLogger(__name__)
 
 class LogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        logger.info(
-            f"🔍 Request: {request.method} {request.url.path} from {request.client.host}"
-        )
+        client = request.client.host
+        method = request.method
+        path = request.url.path
+        logger.info("🔍 Request: %s %s from %s", method, path, client)
+
         response = await call_next(request)
-        logger.info(
-            f"✅ Response: {response.status_code} for {request.method} {request.url.path}"
-        )
+
+        logger.info("✅ Response: %s for %s %s", response.status_code, method, path)
         return response
-
-
-
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global whisper_model, session_histories
-
     logger.info("🚀 ParkPartner starting up...")
-    logger.info(f"⏳ Loading Whisper model '{WHISPER_MODEL}'...")
-    whisper_model = whisper.load_model(WHISPER_MODEL)
+    logger.info("⏳ Loading Whisper model '%s'...", WHISPER_MODEL)
+
+    set_whisper_model(whisper.load_model(WHISPER_MODEL))
     logger.info("✅ Whisper loaded")
 
-    session_histories = {}
+    set_session_histories({})
 
     yield
     logger.info("🛑 ParkPartner shutting down...")

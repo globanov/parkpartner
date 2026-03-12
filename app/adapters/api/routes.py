@@ -1,28 +1,22 @@
-import os
+import hashlib
 import logging
-import traceback
-import asyncio
-import tempfile
+import os
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Header, UploadFile, File, BackgroundTasks
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
-from app.config import SECRET_TOKEN, WHISPER_LANGUAGE, OLLAMA_BASE_URL, OLLAMA_MODEL
-from app.adapters.llm.ollama import call_ollama
-from app.adapters.stt.whisper import transcribe_audio
-from app.adapters.tts.edge import synthesize_speech
-from app.core.state import session_histories, whisper_model
+
+from app.config import OLLAMA_BASE_URL, OLLAMA_MODEL, TTS_VOICE, WHISPER_LANGUAGE
+from app.core.dependencies import deps
+from app.core.state import get_session_histories, get_session_lock, get_whisper_model
+from app.domain.service import (
+    ConversationConfig,
+    ConversationDeps,
+    process_conversation,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-def check_token(authorization: str | None = Header(default=None)) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing token")
-    token = authorization.replace("Bearer ", "")
-    if token != SECRET_TOKEN:
-        raise HTTPException(status_code=403, detail="Invalid token")
-    return token
 
 
 def cleanup_files(*paths):
@@ -42,98 +36,107 @@ async def health():
 
 @router.get("/", response_class=HTMLResponse)
 async def serve_frontend():
-    with open("static/index.html", "r", encoding="utf-8") as f:
+    with open("static/index.html", encoding="utf-8") as f:
         return HTMLResponse(f.read())
+
+
+def _validate_audio_file(file: UploadFile, audio_data: bytes) -> None:
+    """Validate audio file format and size"""
+    valid_types = ["audio/webm", "audio/mp4", "audio/wav", "audio/mpeg"]
+    if file.content_type not in valid_types:
+        logger.warning(f"Unsupported format: {file.content_type}")
+        raise HTTPException(status_code=400, detail="Unsupported audio format")
+
+    if len(audio_data) > 10 * 1024 * 1024:
+        logger.warning(f"File too large: {len(audio_data)} bytes")
+        raise HTTPException(status_code=413, detail="File too large (max 10MB)")
+
+
+def _handle_processing_error(
+    tts_path: str | None,
+    error: Exception,
+    status_code: int,
+    message: str,
+    is_warning: bool = False,
+) -> None:
+    """Handle processing errors with cleanup"""
+    if is_warning:
+        logger.warning(message)
+    else:
+        logger.error(message)
+
+    if tts_path and os.path.exists(tts_path):
+        cleanup_files(tts_path)
+
+    raise HTTPException(status_code=status_code, detail=str(error)) from error
 
 
 @router.post("/process")
 async def process_audio(
-    file: UploadFile = File(...),
-    authorization: str | None = Header(default=None),
-    background_tasks: BackgroundTasks = None,
+    file: UploadFile = File(...),  # noqa: B008 - FastAPI standard pattern
+    background_tasks=None,
 ):
-
-    token = check_token(authorization)
-    session_id = token
+    session_id = "anonymous"
+    session_hash = hashlib.sha256(session_id.encode()).hexdigest()[:8]
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    logger.info(f"[{ts}] Request session={session_id[:8]}")
-
-    if file.content_type not in ["audio/webm", "audio/mp4", "audio/wav", "audio/mpeg"]:
-        logger.warning(f"Unsupported format: {file.content_type}")
-        raise HTTPException(status_code=400, detail="Unsupported audio format")
+    logger.info(f"[{ts}] Request session={session_hash}")
 
     audio_data = await file.read()
+    _validate_audio_file(file, audio_data)
+
     logger.debug(f"[{ts}] Received {len(audio_data)} bytes, type={file.content_type}")
 
-    if session_id not in session_histories:
-        session_histories[session_id] = []
-    history = session_histories[session_id]
-
-    tmp_path = None
     tts_path = None
-
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
-            tmp.write(audio_data)
-            tmp_path = tmp.name
-            logger.debug(f"Temp input: {tmp_path}")
+        conv_config = ConversationConfig(
+            whisper_language=WHISPER_LANGUAGE,
+            ollama_model=OLLAMA_MODEL,
+            ollama_base_url=OLLAMA_BASE_URL,
+            tts_voice=TTS_VOICE,
+        )
+        conv_deps = ConversationDeps(
+            stt_fn=deps.stt_fn,
+            llm_fn=deps.llm_fn,
+            tts_fn=deps.tts_fn,
+        )
 
-        logger.info("Transcribing...")
-        result = await transcribe_audio(whisper_model, tmp_path, WHISPER_LANGUAGE)
-        user_text = result["text"].strip()
-        logger.info(f"User: '{user_text}'")
-        logger.debug(f"Transcription raw: {result}")
-
-        if not user_text:
-            logger.warning("No speech detected")
-            raise HTTPException(status_code=400, detail="No speech detected")
-
-        logger.info("Generating response...")
-        history.append({"role": "user", "content": user_text})
-        messages = [
-            {
-                "role": "system",
-                "content": "Ты дружелюбный помощник для прогулок в парке. Отвечай кратко (1-3 предложения).",
-            },
-            *history[-6:],
-        ]
-        assistant_text = call_ollama(messages, OLLAMA_MODEL, OLLAMA_BASE_URL)
-        logger.info(f"Assistant: '{assistant_text}'")
-        history.append({"role": "assistant", "content": assistant_text})
-        history[:] = history[-6:]
-
-        logger.info("Synthesizing speech...")
-        tts_path = tmp_path + ".mp3"
-        logger.debug(f"Temp TTS output: {tts_path}")
-
-        try:
-            tts_path = await synthesize_speech(
-                assistant_text, "ru-RU-DmitryNeural", tts_path
-            )
-            file_size = os.path.getsize(tts_path)
-            logger.info(f"TTS saved: {tts_path} ({file_size} bytes)")
-        except asyncio.TimeoutError:
-            logger.error("TTS timeout")
-            raise HTTPException(status_code=504, detail="TTS service timed out")
-        except Exception as e:
-            logger.error(f"TTS error: {e}\n{traceback.format_exc()}")
-            raise HTTPException(status_code=502, detail=f"TTS failed: {str(e)}")
-
-        if background_tasks:
-            background_tasks.add_task(cleanup_files, tmp_path, tts_path)
-            logger.debug(f"Cleanup scheduled for: {tmp_path}, {tts_path}")
+        user_text, assistant_text, tts_path = await process_conversation(
+            audio_data=audio_data,
+            session_id=session_id,
+            session_histories=get_session_histories(),
+            session_lock=get_session_lock(),
+            whisper_model=get_whisper_model(),
+            deps=conv_deps,
+            config=conv_config,
+        )
 
         logger.info(
-            f"[{ts}] Session {session_id[:8]}: '{user_text}' -> '{assistant_text}' | TTS: {tts_path}"
+            f"[{ts}] Session {session_hash}: '{user_text}' -> '{assistant_text}'"
+            f" | TTS: {tts_path}",
         )
+
+        if background_tasks:
+            background_tasks.add_task(cleanup_files, tts_path)
+            logger.debug(f"Cleanup scheduled for: {tts_path}")
+
+        if not os.path.exists(tts_path):
+            logger.error(f"TTS file not found: {tts_path}")
+            raise HTTPException(status_code=500, detail="TTS file not created")
 
         return FileResponse(tts_path, media_type="audio/mpeg", filename="response.mp3")
 
+    except ValueError as e:
+        _handle_processing_error(
+            tts_path,
+            e,
+            400,
+            f"No speech detected: {e}",
+            is_warning=True,
+        )
     except HTTPException:
         logger.warning("HTTPException, cleaning up...")
-        cleanup_files(tmp_path, tts_path)
+        if tts_path and os.path.exists(tts_path):
+            cleanup_files(tts_path)
         raise
     except Exception as e:
-        logger.error(f"Unexpected error: {e}\n{traceback.format_exc()}")
-        cleanup_files(tmp_path, tts_path)
-        raise HTTPException(status_code=500, detail=str(e))
+        _handle_processing_error(tts_path, e, 500, f"Unexpected error: {e}")

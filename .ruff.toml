@@ -3,17 +3,74 @@ target-version = "py311"
 
 [lint]
 select = [
-    "E",   # Pycodestyle errors
-    "F",   # Pyflakes
-    "W",   # Pycodestyle warnings
-    "I",   # Import sorting
-    "N",   # PEP8 naming
-    "UP",  # Pyupgrade
-    "B",   # Bugbear
-    "PL",  # Pylint-compatible rules
-    "C90", # McCabe complexity
+    "E",    # Pycodestyle errors
+    "F",    # Pyflakes
+    "W",    # Pycodestyle warnings
+    "I",    # Import sorting
+    "N",    # PEP8 naming
+    "UP",   # Pyupgrade
+    "B",    # Bugbear
+    "C4",   # flake8-comprehensions
+    "C90",  # McCabe complexity
+    "COM",  # flake8-commas
+    "DTZ",  # flake8-datetimez
+    "ERA",  # eradicate (commented-out code)
+    "EXE",  # flake8-executable
+    "FA",   # flake8-future-annotations
+    "FLY",  # flynt
+    "FURB", # Refurb (Python refactoring suggestions)
+    "G",    # flake8-logging-format
+    "ISC",  # flake8-implicit-str-concat
+    "LOG",  # flake8-logging
+    "PERF", # Perflint (performance anti-patterns)
+    "PIE",  # flake8-pie
+    "PL",   # Pylint-compatible rules
+    "PT",   # flake8-pytest-style
+    "PYI",  # flake8-pyi (type stub files)
+    "Q",    # flake8-quotes
+    "RET",  # flake8-return
+    "RSE",  # flake8-raise
+    "RUF",  # Ruff-specific rules
+    "S",    # flake8-bandit (security)
+    "SIM",  # flake8-simplify
+    "SLF",  # flake8-self (private member access)
+    "SLOT", # flake8-slots
+    "T10",  # flake8-debugger
+    "TCH",  # flake8-type-checking
+    "TID",  # flake8-tidy-imports
+    "TRY",  # tryceratops (exception handling)
 ]
-ignore = []
+ignore = [
+    # Project-specific ignores
+    "S101",   # assert statements (needed for tests)
+    "SLF001", # private member access (too strict for this project)
+    "TC001",  # type-checking imports (not needed yet)
+    
+    # Logging f-strings - modern Python logging, performance difference is negligible
+    "G004",   # Logging statement uses f-string
+    
+    # Timezone-naive datetime - acceptable for local development server
+    "DTZ005", # datetime.datetime.now() without tz
+    
+    # Exception handling style - these are too opinionated
+    "TRY003", # Avoid long messages outside exception class
+    "TRY300", # Consider moving to else block
+    "TRY301", # Abstract raise to inner function
+    "TRY400", # Use logging.exception (we control log level explicitly)
+    
+    # Security - binding to 0.0.0.0 is intentional for local server
+    "S104",   # Possible binding to all interfaces
+    
+    # Trailing commas - let ruff format handle this
+    "COM812", # Trailing comma missing
+    
+    # Test-specific ignores (too strict for unit tests)
+    "S108",   # Insecure temporary file usage (tests use /tmp intentionally)
+    "PLR2004", # Magic values in tests (status codes, etc.)
+    "PLC0415", # Import inside function (needed for pytest fixtures)
+    "SIM117", # Nested with statements (common in pytest tests)
+    "E501",   # Line too long (long mock paths in tests)
+]
 fixable = ["ALL"]
 unfixable = []
 
