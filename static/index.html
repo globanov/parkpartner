@@ -72,7 +72,6 @@
 </div>
 
 <script>
-    const SECRET_TOKEN = 'moi_secret_123';
     const recordBtn = document.getElementById('recordBtn');
     const status = document.getElementById('status');
     const conversation = document.getElementById('conversation');
@@ -141,7 +140,6 @@
 
             const response = await fetch('/process', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${SECRET_TOKEN}` },
                 body: formData
             });
 
