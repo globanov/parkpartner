@@ -41,7 +41,8 @@ Project-specific markers:
 
 **Cleanup caches:**
 ```bash
-rm -rf .pytest_cache .ruff_cache .coverage_cache/ htmlcov/ logs/*.log
+rm -rf logs/htmlcov logs/.coverage logs/e2e_test_*.log
+rm -rf .pytest_cache .ruff_cache
 ```
 
 ---
