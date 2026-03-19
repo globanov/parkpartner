@@ -1,6 +1,47 @@
 [tool.pytest.ini_options]
+pythonpath = ["."]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 addopts = "-v --tb=short"
+markers = [
+    "system: mark test as a system/E2E test",
+    "requires_services: mark test as requiring external services (Ollama, etc.)",
+    "slow: mark test as slow running (>1 second)",
+    "integration: mark test as an integration test",
+    "smoke: mark test as a smoke test (critical path)",
+    "performance: mark test as a performance test",
+    "browser: mark test as requiring browser (Playwright)",
+]
+
+[tool.coverage.run]
+source = ["app"]
+data_file = "logs/.coverage"
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/.venv/*",
+    "parkpartner.py",
+]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+show_missing = true
+skip_covered = true
+
+[tool.coverage.html]
+directory = "logs/htmlcov"
+
+[tool.coverage.xml]
+output = "logs/coverage.xml"
