@@ -15,7 +15,7 @@ flowchart TD
     end
 
     subgraph Server["🏠 Server (Mac)"]
-        API["🐍 FastAPI main.py"]
+        API["🐍 FastAPI parkpartner.py"]
         History["💾 Dialog History"]
     end
 
@@ -55,7 +55,8 @@ flowchart TD
 
 ```
 parkpartner/
-├── main.py                 # FastAPI application entry point
+├── parkpartner.py        # FastAPI application entry point
+├── start_parkpartner_with_tunnel.sh  # Shell script for server + tunnel
 ├── app/
 │   ├── adapters/           # External service implementations
 │   │   ├── api/            # HTTP API routes
@@ -75,6 +76,7 @@ parkpartner/
 │   ├── test_adapters.py
 │   ├── test_routes.py
 │   └── test_service.py
+├── logs/                   # Application logs
 └── docs/
     └── architecture.md     # This file
 ```
@@ -165,15 +167,6 @@ MAX_HISTORY_MESSAGES = 6
 - ✅ Type validation with Pydantic
 - ✅ Easy testing with TestClient
 
-## Security Considerations
-
-| Concern | Current State | Recommendation |
-|---------|---------------|----------------|
-| **CORS** | `allow_origins=["*"]` | Restrict to specific domains in production |
-| **File Upload** | 10MB limit | Adequate for voice recordings |
-| **Session Management** | Single "anonymous" session | Add user authentication for multi-user |
-| **Audio Storage** | Temporary files, auto-deleted | No persistent storage (privacy+) |
-
 ## Performance Characteristics
 
 | Operation | Typical Latency | Notes |
@@ -185,9 +178,11 @@ MAX_HISTORY_MESSAGES = 6
 
 ## Testing Strategy
 
+See [Testing Guide](TESTING.md) for comprehensive testing documentation.
+
 - **Unit Tests** (`tests/`) - Mock external services, test business logic
-- **Integration Tests** - Future: Test full pipeline with real services
-- **E2E Tests** - Future: Browser automation with Playwright
+- **Integration Tests** (`tests/integration/`) - Test service interactions
+- **System Tests** (`tests/system/`) - E2E tests with real services
 
 ## Future Improvements
 
