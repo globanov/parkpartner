@@ -27,8 +27,15 @@ models/
 # Audio files (temp)
 *.wav
 *.webm
+
+# All logs and test artifacts
+logs/
+
+# Safety nets (in case something writes outside logs/)
+*.log
 *.mp3
 tmp/
 
-# Log
-parkpartner.log
+# Caches at root level
+.pytest_cache/
+.ruff_cache/
