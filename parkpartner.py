@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("parkpartner.log", encoding="utf-8"),
+        logging.FileHandler("logs/parkpartner.log", encoding="utf-8"),
         logging.StreamHandler(),
     ],
 )
@@ -66,4 +66,4 @@ app.add_middleware(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("parkpartner:app", host="0.0.0.0", port=8000, reload=False)
