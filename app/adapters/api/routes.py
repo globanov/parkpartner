@@ -40,6 +40,20 @@ async def serve_frontend():
         return HTMLResponse(f.read())
 
 
+def _validate_webm_header(audio_data: bytes) -> bool:
+    """
+    Validate WebM file header.
+
+    WebM files start with EBML header: 0x1A 0x45 0xDF 0xA3
+    Returns True if valid WebM header detected.
+    """
+    if len(audio_data) < 4:
+        return False
+
+    webm_magic = bytes([0x1A, 0x45, 0xDF, 0xA3])
+    return audio_data[:4] == webm_magic
+
+
 def _validate_audio_file(file: UploadFile, audio_data: bytes) -> None:
     """Validate audio file format and size"""
     valid_types = ["audio/webm", "audio/mp4", "audio/wav", "audio/mpeg"]
@@ -50,6 +64,19 @@ def _validate_audio_file(file: UploadFile, audio_data: bytes) -> None:
     if len(audio_data) > 10 * 1024 * 1024:
         logger.warning(f"File too large: {len(audio_data)} bytes")
         raise HTTPException(status_code=413, detail="File too large (max 10MB)")
+
+    # Check for empty or very small files
+    if len(audio_data) < 1024:  # Less than 1KB
+        logger.warning(f"File too small: {len(audio_data)} bytes")
+        raise HTTPException(status_code=400, detail="Audio file too small or empty")
+
+    # Validate WebM header for webm files
+    if file.content_type == "audio/webm":
+        if not _validate_webm_header(audio_data):
+            logger.warning("Invalid WebM header detected")
+            raise HTTPException(
+                status_code=400, detail="Corrupted or invalid WebM file"
+            )
 
 
 def _handle_processing_error(

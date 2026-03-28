@@ -22,11 +22,11 @@ def get_whisper_model() -> object:
 
 def set_whisper_model(model: object) -> None:
     """Set Whisper model"""
-    global _whisper_model  # noqa: PLW0603
+    global _whisper_model
     _whisper_model = model
 
 
 def set_session_histories(histories: dict[str, list[dict]]) -> None:
     """Set session histories"""
-    global _session_histories  # noqa: PLW0603
+    global _session_histories
     _session_histories = histories
