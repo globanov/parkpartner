@@ -58,10 +58,23 @@
             background: #2ecc71; color: #fff; border: none; padding: 10px 20px;
             border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px;
         }
+        .localhost-warning {
+            background: rgba(241, 196, 15, 0.2);
+            border: 1px solid #f1c40f;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .localhost-warning a { color: #f1c40f; text-decoration: underline; }
     </style>
 </head>
 <body>
 <div class="container">
+    <div id="localhostWarning" class="localhost-warning">
+        ⚠️ <strong>Use localhost for microphone access</strong><br>
+        <small>Click here: <a href="http://localhost:8000">localhost:8000</a></small>
+    </div>
     <h1>ParkPartner 🎙️</h1>
     <p class="subtitle">Your AI walking companion</p>
     <button class="record-btn" id="recordBtn">
@@ -75,12 +88,39 @@
     const recordBtn = document.getElementById('recordBtn');
     const status = document.getElementById('status');
     const conversation = document.getElementById('conversation');
+    const localhostWarning = document.getElementById('localhostWarning');
     let mediaRecorder = null;
     let audioChunks = [];
     let isRecording = false;
 
+    // Show warning if accessed via 0.0.0.0 (microphone won't work)
+    if (window.location.hostname === '0.0.0.0' || window.location.hostname === '') {
+        localhostWarning.style.display = 'block';
+        console.warn('Accessed via 0.0.0.0 - microphone requires localhost or HTTPS');
+    }
+
+    // Check if MediaDevices API is available
+    function checkMediaDevices() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            status.innerHTML = '❌ Microphone not available<br><small>Use HTTPS or localhost</small>';
+            status.className = 'status error';
+            recordBtn.disabled = true;
+            console.error('MediaDevices API not available - requires HTTPS or localhost');
+            return false;
+        }
+        return true;
+    }
+
+    // Check on page load
+    checkMediaDevices();
+
     // iOS fix: create new stream for EACH recording
     async function startRecording() {
+        // Double-check before recording
+        if (!checkMediaDevices()) {
+            return;
+        }
+
         audioChunks = [];
 
         try {
