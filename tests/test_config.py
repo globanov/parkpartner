@@ -83,9 +83,7 @@ class TestConfigFromEnvironment:
             ("LLM_MAX_TOKENS", "300", "LLM_MAX_TOKENS", 300),
         ],
     )
-    def test_config_from_env(
-        self, env_var, env_value, config_name, expected_value
-    ):
+    def test_config_from_env(self, env_var, env_value, config_name, expected_value):
         """Test configuration from environment variables"""
         import importlib
 

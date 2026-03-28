@@ -113,9 +113,13 @@ class TestEdgeTTSAdapter:
         mock_communicate = AsyncMock()
         mock_communicate.save = AsyncMock()
 
-        with patch(
-            "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ), patch("os.path.exists", return_value=True):
+        with (
+            patch(
+                "app.adapters.tts.edge.edge_tts.Communicate",
+                return_value=mock_communicate,
+            ),
+            patch("os.path.exists", return_value=True),
+        ):
             result = await synthesize_speech(
                 text="Hello",
                 voice="ru-RU-DmitryNeural",
@@ -132,9 +136,13 @@ class TestEdgeTTSAdapter:
         mock_communicate = AsyncMock()
         mock_communicate.save = AsyncMock()
 
-        with patch(
-            "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ), patch("os.path.exists", return_value=False):
+        with (
+            patch(
+                "app.adapters.tts.edge.edge_tts.Communicate",
+                return_value=mock_communicate,
+            ),
+            patch("os.path.exists", return_value=False),
+        ):
             with pytest.raises(RuntimeError) as exc_info:
                 await synthesize_speech(
                     text="Hello",
@@ -151,9 +159,13 @@ class TestEdgeTTSAdapter:
         mock_communicate = AsyncMock()
         mock_communicate.save = AsyncMock(side_effect=TimeoutError())
 
-        with patch(
-            "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ), pytest.raises(RuntimeError, match="TTS timeout"):
+        with (
+            patch(
+                "app.adapters.tts.edge.edge_tts.Communicate",
+                return_value=mock_communicate,
+            ),
+            pytest.raises(RuntimeError, match="TTS timeout"),
+        ):
             await synthesize_speech(
                 text="Hello",
                 voice="ru-RU-DmitryNeural",
@@ -167,9 +179,13 @@ class TestEdgeTTSAdapter:
         mock_communicate = AsyncMock()
         mock_communicate.save = AsyncMock()
 
-        with patch(
-            "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ), patch("os.path.exists", return_value=True):
+        with (
+            patch(
+                "app.adapters.tts.edge.edge_tts.Communicate",
+                return_value=mock_communicate,
+            ),
+            patch("os.path.exists", return_value=True),
+        ):
             result = await synthesize_speech(
                 text="",
                 voice="ru-RU-DmitryNeural",
@@ -188,9 +204,13 @@ class TestEdgeTTSAdapter:
 
         long_text = "A" * 5000  # Very long text
 
-        with patch(
-            "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ), patch("os.path.exists", return_value=True):
+        with (
+            patch(
+                "app.adapters.tts.edge.edge_tts.Communicate",
+                return_value=mock_communicate,
+            ),
+            patch("os.path.exists", return_value=True),
+        ):
             result = await synthesize_speech(
                 text=long_text,
                 voice="ru-RU-DmitryNeural",
@@ -206,9 +226,13 @@ class TestEdgeTTSAdapter:
         mock_communicate = AsyncMock()
         mock_communicate.save = AsyncMock()
 
-        with patch(
-            "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ), patch("os.path.exists", return_value=True):
+        with (
+            patch(
+                "app.adapters.tts.edge.edge_tts.Communicate",
+                return_value=mock_communicate,
+            ),
+            patch("os.path.exists", return_value=True),
+        ):
             await synthesize_speech(
                 text="Hello",
                 voice="ru-RU-SvetlanaNeural",
