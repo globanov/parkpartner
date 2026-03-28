@@ -10,21 +10,65 @@ jobs:
         python-version: ["3.12"]
     steps:
     - uses: actions/checkout@v4
+    
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Cache ruff
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ruff
+        key: ${{ runner.os }}-ruff-${{ hashFiles('.ruff.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-ruff-
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install ruff
         pip install -r requirements.txt
+    
     - name: Ruff linting check
       run: |
         ruff check .
+    
     - name: Ruff format check
       run: |
         ruff format --check .
-    - name: Run tests
+    
+    - name: Run tests with coverage
       run: |
-        python -m pytest tests/ -v
+        python -m pytest tests/ \
+          --ignore=tests/system/ \
+          --cov=app \
+          --cov-fail-under=90 \
+          --cov-report=xml \
+          --cov-report=html \
+          --junitxml=pytest-results.xml \
+          -v
+    
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report
+        path: |
+          htmlcov/
+          coverage.xml
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: pytest-results
+        path: pytest-results.xml
