@@ -1,0 +1,5 @@
+# Test fixtures directory
+# Add test audio files here:
+# - test_audio.webm (Russian greeting: "Привет, как дела?")
+# - silence.webm (silent audio for testing)
+# - invalid.webm (corrupted file for negative tests)

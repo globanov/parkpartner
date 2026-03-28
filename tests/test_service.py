@@ -5,6 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.adapters.llm.ollama import call_ollama
+from app.adapters.stt.whisper import transcribe_audio
+from app.adapters.tts.edge import synthesize_speech
 from app.domain.service import (
     SYSTEM_PROMPT,
     ConversationConfig,
@@ -44,11 +47,11 @@ def mock_config():
 
 @pytest.fixture
 def mock_deps():
-    """Mock dependencies"""
+    """Mock dependencies with proper specs"""
     return ConversationDeps(
-        stt_fn=AsyncMock(),
-        llm_fn=MagicMock(),
-        tts_fn=AsyncMock(),
+        stt_fn=AsyncMock(spec=transcribe_audio),
+        llm_fn=MagicMock(spec=call_ollama),
+        tts_fn=AsyncMock(spec=synthesize_speech),
     )
 
 
