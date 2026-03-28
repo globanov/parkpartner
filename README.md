@@ -60,8 +60,6 @@ See [Testing Guide](docs/TESTING.md) for test commands and troubleshooting.
 
 ## Troubleshooting
 
-See [Testing Guide](docs/TESTING.md) for test-related issues.
-
 **"Ollama service unavailable"**
 - Run: `ollama serve`
 - Pull model: `ollama pull qwen2.5:3b`

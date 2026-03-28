@@ -178,11 +178,11 @@ MAX_HISTORY_MESSAGES = 6
 
 ## Testing Strategy
 
-See [Testing Guide](TESTING.md) for comprehensive testing documentation.
-
 - **Unit Tests** (`tests/`) - Mock external services, test business logic
 - **Integration Tests** (`tests/integration/`) - Test service interactions
 - **System Tests** (`tests/system/`) - E2E tests with real services
+
+For details, see [Testing Guide](TESTING.md).
 
 ## Future Improvements
 

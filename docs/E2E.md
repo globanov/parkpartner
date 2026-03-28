@@ -122,30 +122,3 @@ Requires Playwright:
 ```bash
 pip install playwright && playwright install chromium
 ```
-
-## Troubleshooting
-
-**Port 8000 in use:**
-```bash
-lsof -ti:8000 | xargs kill -9
-pkill -f "uvicorn.*parkpartner"
-```
-
-**Server failed to start:**
-```bash
-tail -50 logs/e2e_test_*.log
-```
-
-**Playwright not installed:**
-```bash
-pip install playwright && playwright install chromium
-```
-
-**Browser test failures:**
-```bash
-python run_e2e_tests.py --headed  # Show browser
-```
-
----
-
-**Status:** ✅ Ready | **Scripts:** `run_e2e_tests.py`, `run_e2e_tests.sh`

@@ -1,7 +1,5 @@
 # ParkPartner Testing Guide
 
-**See also:** [README.md](../README.md) | [Architecture](architecture.md) | [E2E Tests](E2E.md)
-
 ## Quick Start
 
 ```bash
