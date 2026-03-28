@@ -346,10 +346,9 @@ def main():
 
     try:
         # Check prerequisites
-        if not args.skip_checks:
-            if not check_prerequisites():
-                log_error("Prerequisites check failed")
-                sys.exit(1)
+        if not args.skip_checks and not check_prerequisites():
+            log_error("Prerequisites check failed")
+            sys.exit(1)
 
         # Start server
         server_process = start_server()

@@ -71,12 +71,11 @@ def _validate_audio_file(file: UploadFile, audio_data: bytes) -> None:
         raise HTTPException(status_code=400, detail="Audio file too small or empty")
 
     # Validate WebM header for webm files
-    if file.content_type == "audio/webm":
-        if not _validate_webm_header(audio_data):
-            logger.warning("Invalid WebM header detected")
-            raise HTTPException(
-                status_code=400, detail="Corrupted or invalid WebM file"
-            )
+    if file.content_type == "audio/webm" and not _validate_webm_header(audio_data):
+        logger.warning("Invalid WebM header detected")
+        raise HTTPException(
+            status_code=400, detail="Corrupted or invalid WebM file"
+        )
 
 
 def _handle_processing_error(

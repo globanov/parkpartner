@@ -115,17 +115,16 @@ class TestEdgeTTSAdapter:
 
         with patch(
             "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ):
-            with patch("os.path.exists", return_value=True):
-                result = await synthesize_speech(
-                    text="Hello",
-                    voice="ru-RU-DmitryNeural",
-                    output_path="/tmp/test.mp3",
-                    timeout=20,
-                )
+        ), patch("os.path.exists", return_value=True):
+            result = await synthesize_speech(
+                text="Hello",
+                voice="ru-RU-DmitryNeural",
+                output_path="/tmp/test.mp3",
+                timeout=20,
+            )
 
-                assert result == "/tmp/test.mp3"
-                mock_communicate.save.assert_awaited_once()
+            assert result == "/tmp/test.mp3"
+            mock_communicate.save.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_synthesize_speech_file_not_created(self):
@@ -135,17 +134,16 @@ class TestEdgeTTSAdapter:
 
         with patch(
             "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ):
-            with patch("os.path.exists", return_value=False):
-                with pytest.raises(RuntimeError) as exc_info:
-                    await synthesize_speech(
-                        text="Hello",
-                        voice="ru-RU-DmitryNeural",
-                        output_path="/tmp/test.mp3",
-                        timeout=20,
-                    )
+        ), patch("os.path.exists", return_value=False):
+            with pytest.raises(RuntimeError) as exc_info:
+                await synthesize_speech(
+                    text="Hello",
+                    voice="ru-RU-DmitryNeural",
+                    output_path="/tmp/test.mp3",
+                    timeout=20,
+                )
 
-                assert "not created" in str(exc_info.value)
+            assert "not created" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_synthesize_speech_timeout(self):
@@ -155,14 +153,13 @@ class TestEdgeTTSAdapter:
 
         with patch(
             "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ):
-            with pytest.raises(RuntimeError, match="TTS timeout"):
-                await synthesize_speech(
-                    text="Hello",
-                    voice="ru-RU-DmitryNeural",
-                    output_path="/tmp/test.mp3",
-                    timeout=1,
-                )
+        ), pytest.raises(RuntimeError, match="TTS timeout"):
+            await synthesize_speech(
+                text="Hello",
+                voice="ru-RU-DmitryNeural",
+                output_path="/tmp/test.mp3",
+                timeout=1,
+            )
 
     @pytest.mark.asyncio
     async def test_synthesize_speech_empty_text(self):
@@ -172,17 +169,16 @@ class TestEdgeTTSAdapter:
 
         with patch(
             "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ):
-            with patch("os.path.exists", return_value=True):
-                result = await synthesize_speech(
-                    text="",
-                    voice="ru-RU-DmitryNeural",
-                    output_path="/tmp/test.mp3",
-                    timeout=20,
-                )
+        ), patch("os.path.exists", return_value=True):
+            result = await synthesize_speech(
+                text="",
+                voice="ru-RU-DmitryNeural",
+                output_path="/tmp/test.mp3",
+                timeout=20,
+            )
 
-                assert result == "/tmp/test.mp3"
-                mock_communicate.save.assert_awaited_once()
+            assert result == "/tmp/test.mp3"
+            mock_communicate.save.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_synthesize_speech_long_text(self):
@@ -194,16 +190,15 @@ class TestEdgeTTSAdapter:
 
         with patch(
             "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ):
-            with patch("os.path.exists", return_value=True):
-                result = await synthesize_speech(
-                    text=long_text,
-                    voice="ru-RU-DmitryNeural",
-                    output_path="/tmp/test.mp3",
-                    timeout=20,
-                )
+        ), patch("os.path.exists", return_value=True):
+            result = await synthesize_speech(
+                text=long_text,
+                voice="ru-RU-DmitryNeural",
+                output_path="/tmp/test.mp3",
+                timeout=20,
+            )
 
-                assert result == "/tmp/test.mp3"
+            assert result == "/tmp/test.mp3"
 
     @pytest.mark.asyncio
     async def test_synthesize_speech_different_voice(self):
@@ -213,13 +208,12 @@ class TestEdgeTTSAdapter:
 
         with patch(
             "app.adapters.tts.edge.edge_tts.Communicate", return_value=mock_communicate
-        ):
-            with patch("os.path.exists", return_value=True):
-                await synthesize_speech(
-                    text="Hello",
-                    voice="ru-RU-SvetlanaNeural",
-                    output_path="/tmp/test.mp3",
-                    timeout=20,
-                )
+        ), patch("os.path.exists", return_value=True):
+            await synthesize_speech(
+                text="Hello",
+                voice="ru-RU-SvetlanaNeural",
+                output_path="/tmp/test.mp3",
+                timeout=20,
+            )
 
-                mock_communicate.save.assert_awaited_once()
+            mock_communicate.save.assert_awaited_once()

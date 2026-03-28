@@ -105,7 +105,7 @@ class TestConfigFromEnvironment:
         custom_prompt = "Ты тестовый помощник."
         with patch.dict(os.environ, {"SYSTEM_PROMPT": custom_prompt}):
             importlib.reload(app.config)
-            assert app.config.SYSTEM_PROMPT == custom_prompt
+            assert custom_prompt == app.config.SYSTEM_PROMPT
 
     @pytest.mark.parametrize(
         ("env_var", "env_value"),
@@ -121,6 +121,5 @@ class TestConfigFromEnvironment:
 
         import app.config
 
-        with patch.dict(os.environ, {env_var: env_value}):
-            with pytest.raises(ValueError):
-                importlib.reload(app.config)
+        with patch.dict(os.environ, {env_var: env_value}), pytest.raises(ValueError):
+            importlib.reload(app.config)
