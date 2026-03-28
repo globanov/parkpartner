@@ -32,7 +32,12 @@ async def transcribe_audio(
     """
     loop = asyncio.get_event_loop()
     executor = get_whisper_executor()
+
+    def _transcribe():
+        # Use keyword argument for language to support newer Whisper versions
+        return model.transcribe(audio_path, language=language)
+
     return await asyncio.wait_for(
-        loop.run_in_executor(executor, model.transcribe, audio_path, language),
+        loop.run_in_executor(executor, _transcribe),
         timeout=timeout,
     )

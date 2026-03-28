@@ -185,7 +185,16 @@ def run_e2e_tests(server_process, args):
     log_info("Running E2E tests...")
 
     # Build pytest command
-    cmd = [sys.executable, "-m", "pytest", E2E_TEST_FILE, "-v", "--tb=short"]
+    base_url = f"http://{SERVER_HOST}:{SERVER_PORT}"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        E2E_TEST_FILE,
+        "-v",
+        "--tb=short",
+        f"--base-url={base_url}",
+    ]
 
     if args.verbose:
         cmd.append("-s")  # Show print statements

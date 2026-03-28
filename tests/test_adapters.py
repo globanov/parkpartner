@@ -27,8 +27,8 @@ class TestWhisperAdapter:
         )
 
         assert result == {"text": "Hello world"}
-        # Verify transcribe was called with correct arguments (positional)
-        mock_model.transcribe.assert_called_once_with("/tmp/test.wav", "ru")
+        # Verify transcribe was called with correct arguments (keyword for language)
+        mock_model.transcribe.assert_called_once_with("/tmp/test.wav", language="ru")
 
     @pytest.mark.asyncio
     async def test_transcribe_audio_timeout(self):
