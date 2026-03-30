@@ -1,8 +1,8 @@
 # Change Review — ParkPartner
 
-**Generated:** 2026-03-30 12:30:00  
-**Branch:** main  
-**Total Modified:** 7 files  
+**Generated:** 2026-03-30 12:30:00
+**Branch:** main
+**Total Modified:** 7 files
 **Total New:** 4 files
 
 ---
@@ -10,7 +10,7 @@
 ## Section 1: Modified Files (git diff)
 
 ### 1.1 app/adapters/api/routes.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Fix iOS Safari WebM/MP4 validation to accept non-standard audio headers.
 
 **Changes:**
@@ -18,42 +18,42 @@
 @@ -44,18 +44,43 @@ def _validate_webm_header(audio_data: bytes) -> bool:
      """
      Validate WebM file header.
- 
+
 -    WebM files start with EBML header: 0x1A 0x45 0xDF 0xA3
 -    Returns True if valid WebM header detected.
 +    Standard WebM files start with EBML header: 0x1A 0x45 0xDF 0xA3
-+    
++
 +    iOS Safari quirk: MediaRecorder on iOS Safari produces WebM/MP4 files with
 +    non-standard headers (often starts with 0x00 0x00 0x00 0x20 = MP4 'ftyp' box).
 +    We accept these and let Whisper handle validation.
-+    
++
 +    Returns True if valid WebM header detected OR if file looks like MP4 (iOS quirk).
      """
      if len(audio_data) < 4:
          return False
- 
+
 -    webm_magic = bytes([0x1A, 0x45, 0xDF, 0xA3])
 -    return audio_data[:4] == webm_magic
 +    # Standard WebM EBML header
 +    standard_webm = bytes([0x1A, 0x45, 0xDF, 0xA3])
-+    
++
 +    # iOS Safari MediaRecorder produces MP4 container instead of WebM
 +    # MP4 files start with size box: 0x00 0x00 0x00 0x20 followed by 'ftyp'
 +    ios_mp4_ftyp = bytes([0x00, 0x00, 0x00, 0x20])
-+    
++
 +    # Accept standard WebM header
 +    if audio_data[:4] == standard_webm:
 +        return True
-+    
++
 +    # Accept iOS Safari MP4 format (ftyp box)
 +    if audio_data[:4] == ios_mp4_ftyp:
 +        return True
-+    
++
 +    # For small files (<1KB), skip strict header validation
 +    # iOS Safari may produce other non-standard headers
 +    if len(audio_data) < 1024:
 +        return True  # Let Whisper handle validation
-+    
++
 +    return False
 ```
 
@@ -64,7 +64,7 @@
 ---
 
 ### 1.2 app/config.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Add centralized logging configuration with component-based subdirectories.
 
 **Changes:**
@@ -102,7 +102,7 @@
 ---
 
 ### 1.3 parkpartner.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Use centralized logging instead of local basicConfig.
 
 **Changes:**
@@ -130,7 +130,7 @@
 ---
 
 ### 1.4 run_e2e_tests.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Use centralized logging, add new E2E test file.
 
 **Changes:**
@@ -162,7 +162,7 @@
 ---
 
 ### 1.5 tests/system/conftest.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Add centralized logging + move shared browser fixtures here.
 
 **Changes:**
@@ -189,7 +189,7 @@
 ---
 
 ### 1.6 docs/E2E.md
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Update E2E documentation with current test coverage and new true E2E test.
 
 **Changes:**
@@ -205,7 +205,7 @@
 ---
 
 ### 1.7 tests/system/test_e2e_001_browser.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Remove duplicate browser fixtures (moved to system/conftest.py).
 
 **Changes:**
@@ -228,7 +228,7 @@
 ## Section 2: Untracked Files (new files)
 
 ### 2.1 tests/conftest.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Root pytest configuration for unit test logging.
 
 **Content:**
@@ -269,7 +269,7 @@ def _log_test_start(request):
 ---
 
 ### 2.2 tests/integration/conftest.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** Integration test logging configuration.
 
 **Content:**
@@ -301,7 +301,7 @@ def _setup_integration_logging():
 ---
 
 ### 2.3 tests/system/test_e2e_002_true_e2e.py
-**Status:** [KEEP]  
+**Status:** [KEEP]
 **Purpose:** THE ONLY true E2E test covering browser + server with REAL audio.
 
 **Content (first 50 lines):**
@@ -346,7 +346,7 @@ def real_audio_bytes():
 ---
 
 ### 2.4 docs/E2E_TEST_SCENARIOS.md
-**Status:** [REVIEW]  
+**Status:** [REVIEW]
 **Purpose:** Comprehensive analysis of all E2E tests in codebase.
 
 **Content (excerpt):**
@@ -377,7 +377,7 @@ Answer: NO — split between TWO tests until test_e2e_002_true_e2e.py was create
 ---
 
 ### 2.5 docs/TECH_DEBT.md
-**Status:** [REVIEW]  
+**Status:** [REVIEW]
 **Purpose:** Test migration plan and timeout audit checklist.
 
 **Content (excerpt):**

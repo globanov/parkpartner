@@ -1,7 +1,7 @@
 # ParkPartner Test Tech Debt — Migration Plan
 
-**Created:** 2026-03-29  
-**Priority:** Medium  
+**Created:** 2026-03-29
+**Priority:** Medium
 **Estimated Effort:** ~3 hours
 
 ---
@@ -13,8 +13,8 @@ Current test structure mislabels many tests as "E2E" or "system" when they are a
 - **Integration tests** (API-only, no browser)
 - **Redundant tests** (duplicates of existing tests)
 
-**True E2E tests** (browser + server in one test): 1  
-**Mislabelled tests:** ~23  
+**True E2E tests** (browser + server in one test): 1
+**Mislabelled tests:** ~23
 **Redundant tests:** ~8
 
 ---
@@ -247,8 +247,8 @@ tests/
 
 ## 8. Timeout Audit — All Tests
 
-**Priority:** High (prevents hangs)  
-**Estimate:** 2 hours  
+**Priority:** High (prevents hangs)
+**Estimate:** 2 hours
 **Status:** ✅ Started (test_e2e_002_true_e2e.py complete)
 
 ### Task
@@ -307,13 +307,13 @@ Audit ALL test files for missing timeouts.
 def test_something(page: Page):
     # Page load with timeout
     page.goto(base_url, timeout=10000)
-    
+
     # Element wait with timeout
     page.wait_for_selector("#btn", timeout=5000)
-    
+
     # Assertion with timeout
     expect(element).to_be_visible(timeout=5000)
-    
+
     # Full pipeline wait
     page.wait_for_timeout(15000)  # Whisper + Ollama + TTS
 ```
@@ -322,7 +322,7 @@ def test_something(page: Page):
 
 ## Future: Simplify docs/E2E.md
 
-**Priority:** Low  
+**Priority:** Low
 **Status:** TODO
 
 - **Current:** Large, detailed coverage matrix with all scenarios
