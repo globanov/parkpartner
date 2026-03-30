@@ -44,18 +44,40 @@ def _validate_webm_header(audio_data: bytes) -> bool:
     """
     Validate WebM file header.
 
-    WebM files start with EBML header: 0x1A 0x45 0xDF 0xA3
-    Returns True if valid WebM header detected.
+    Standard WebM files start with EBML header: 0x1A 0x45 0xDF 0xA3
+
+    iOS Safari quirk: MediaRecorder on iOS Safari produces WebM/MP4 files with
+    non-standard headers (often starts with 0x00 0x00 0x00 0x20 = MP4 'ftyp' box).
+    We accept these and let Whisper handle validation.
+
+    Returns True if valid WebM header detected OR if file looks like MP4 (iOS quirk).
     """
     if len(audio_data) < 4:
         return False
 
-    webm_magic = bytes([0x1A, 0x45, 0xDF, 0xA3])
-    return audio_data[:4] == webm_magic
+    # Standard WebM EBML header
+    standard_webm = bytes([0x1A, 0x45, 0xDF, 0xA3])
+
+    # iOS Safari MediaRecorder produces MP4 container instead of WebM
+    # MP4 files start with size box: 0x00 0x00 0x00 0x20 followed by 'ftyp'
+    ios_mp4_ftyp = bytes([0x00, 0x00, 0x00, 0x20])
+
+    # Accept standard WebM header
+    if audio_data[:4] == standard_webm:
+        return True
+
+    # Accept iOS Safari MP4 format (ftyp box)
+    if audio_data[:4] == ios_mp4_ftyp:
+        return True
+
+    # For small files (<1KB), skip strict header validation
+    # iOS Safari may produce other non-standard headers
+    return len(audio_data) < 1024  # Let Whisper handle validation
 
 
 def _validate_audio_file(file: UploadFile, audio_data: bytes) -> None:
     """Validate audio file format and size"""
+    # iOS Safari may send audio/mp4 instead of audio/webm
     valid_types = ["audio/webm", "audio/mp4", "audio/wav", "audio/mpeg"]
     if file.content_type not in valid_types:
         logger.warning(f"Unsupported format: {file.content_type}")
@@ -65,15 +87,26 @@ def _validate_audio_file(file: UploadFile, audio_data: bytes) -> None:
         logger.warning(f"File too large: {len(audio_data)} bytes")
         raise HTTPException(status_code=413, detail="File too large (max 10MB)")
 
-    # Check for empty or very small files
-    if len(audio_data) < 1024:  # Less than 1KB
-        logger.warning(f"File too small: {len(audio_data)} bytes")
+    # Check for empty files (0 bytes)
+    # iOS Safari may produce small but valid audio files
+    if len(audio_data) == 0:
+        logger.warning("Empty audio file")
         raise HTTPException(status_code=400, detail="Audio file too small or empty")
 
     # Validate WebM header for webm files
+    # iOS Safari produces non-standard headers (MP4 container) - accept and let Whisper validate
     if file.content_type == "audio/webm" and not _validate_webm_header(audio_data):
-        logger.warning("Invalid WebM header detected")
-        raise HTTPException(status_code=400, detail="Corrupted or invalid WebM file")
+        # Only reject large files with invalid headers (likely corrupted)
+        # Small files or MP4-like headers are accepted (iOS Safari quirk)
+        if len(audio_data) >= 1024:
+            logger.warning(f"Invalid WebM header: {audio_data[:4].hex()}")
+            raise HTTPException(
+                status_code=400, detail="Corrupted or invalid WebM file"
+            )
+        logger.debug(f"Non-standard WebM header (iOS): {audio_data[:4].hex()}")
+
+    # Accept MP4 from iOS Safari without header validation
+    # (iOS MediaRecorder produces MP4 container, not WebM)
 
 
 def _handle_processing_error(

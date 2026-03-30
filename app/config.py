@@ -1,4 +1,8 @@
+import logging
 import os
+import sys
+from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -26,3 +30,70 @@ SYSTEM_PROMPT = os.getenv(
     "Ты дружелюбный помощник для прогулок в парке. Отвечай кратко (1-3 предложения).",
 )
 MAX_HISTORY_MESSAGES = int(os.getenv("MAX_HISTORY_MESSAGES", "6"))
+
+
+# =============================================================================
+# Centralized Logging Configuration
+# =============================================================================
+
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+BASE_LOGS_DIR = Path(__file__).parent.parent / "logs"
+
+# Component type to subdirectory mapping
+LOG_SUBDIRS = {
+    "server": "server",
+    "system": "tests/system",
+    "integration": "tests/integration",
+    "unit": "tests/unit",
+    "e2e": "tests/system",  # E2E tests are system tests
+    "test": "tests/unit",  # Default test type is unit
+}
+
+
+def get_log_filepath(prefix: str, component_type: str = "unit") -> Path:
+    """
+    Generate log file path with standardized naming.
+
+    Format: logs/{component_type}/{prefix}_{YYMMDD}_{HHMMSS}.log
+
+    Args:
+        prefix: Log file prefix (e.g., 'parkpartner', 'e2e', 'test')
+        component_type: Type of component ('server', 'system', 'integration', 'unit')
+
+    Returns:
+        Path to log file
+    """
+    # Get subdirectory for component type
+    subdir = LOG_SUBDIRS.get(component_type, "tests/unit")
+    logs_dir = BASE_LOGS_DIR / subdir
+
+    # Create directory if not exists
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
+    return logs_dir / f"{prefix}_{timestamp}.log"
+
+
+def setup_logging(
+    prefix: str, component_type: str = "unit", level: int = logging.INFO
+) -> None:
+    """
+    Configure logging with unified format.
+
+    Args:
+        prefix: Log file prefix for filename
+        component_type: Type of component ('server', 'system', 'integration', 'unit')
+        level: Logging level (default: INFO)
+    """
+    log_file = get_log_filepath(prefix, component_type)
+
+    logging.basicConfig(
+        level=level,
+        format=LOG_FORMAT,
+        datefmt=DATE_FORMAT,
+        handlers=[
+            logging.FileHandler(log_file, encoding="utf-8"),
+            logging.StreamHandler(sys.stdout),
+        ],
+    )

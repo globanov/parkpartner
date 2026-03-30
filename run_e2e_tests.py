@@ -20,6 +20,7 @@ Requirements:
 """
 
 import argparse
+import logging
 import os
 import signal
 import subprocess
@@ -28,17 +29,26 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from app.config import setup_logging
+
+# Initialize centralized logging
+setup_logging("e2e", component_type="system")
+logger = logging.getLogger(__name__)
+
 # Configuration
 SERVER_HOST = "localhost"
 SERVER_PORT = "8000"
 HEALTH_URL = f"http://{SERVER_HOST}:{SERVER_PORT}/health"
 PROJECT_ROOT = Path(__file__).parent.absolute()
 LOGS_DIR = PROJECT_ROOT / "logs"
-E2E_TEST_FILE = "tests/system/test_e2e_001_browser.py"
+E2E_TEST_FILES = [
+    "tests/system/test_e2e_001_browser.py",
+    "tests/system/test_e2e_002_true_e2e.py",
+]
 
 
 class Colors:
-    """ANSI color codes for terminal output"""
+    """ANSI color codes for terminal output (summary only)"""
 
     HEADER = "\033[95m"
     OKBLUE = "\033[94m"
@@ -51,36 +61,9 @@ class Colors:
     UNDERLINE = "\033[4m"
 
 
-def log(message, level="INFO", color=None):
-    """Print colored log message with timestamp"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    prefix = f"[{timestamp}] {level}:"
-
-    if color:
-        print(f"{color}{prefix} {message}{Colors.ENDC}")
-    else:
-        print(f"{prefix} {message}")
-
-
-def log_info(message):
-    log(message, "INFO", Colors.OKCYAN)
-
-
-def log_success(message):
-    log(message, "✓", Colors.OKGREEN)
-
-
-def log_error(message):
-    log(message, "✗", Colors.FAIL)
-
-
-def log_warning(message):
-    log(message, "⚠", Colors.WARNING)
-
-
 def check_prerequisites():
     """Check if all required services and dependencies are available"""
-    log_info("Checking prerequisites...")
+    logger.info("Checking prerequisites...")
 
     all_ok = True
 
@@ -92,21 +75,21 @@ def check_prerequisites():
             timeout=5,
         )
         if result.returncode == 0 and "qwen2.5" in result.stdout.decode():
-            log_success("Ollama service is running with qwen2.5 model")
+            logger.info("✅ Ollama service is running with qwen2.5 model")
         else:
-            log_warning("Ollama service may not have qwen2.5 model pulled")
-            log_info("Run: ollama pull qwen2.5:3b")
+            logger.warning("⚠️ Ollama service may not have qwen2.5 model pulled")
+            logger.info("Run: ollama pull qwen2.5:3b")
     except Exception:
-        log_warning("Ollama service not detected")
-        log_info("Start with: ollama serve")
+        logger.warning("⚠️ Ollama service not detected")
+        logger.info("Start with: ollama serve")
 
     # Check Playwright
     try:
         __import__("playwright")
-        log_success("Playwright is installed")
+        logger.info("✅ Playwright is installed")
     except ImportError:
-        log_error("Playwright not installed")
-        log_info("Run: pip install playwright && playwright install chromium")
+        logger.error("❌ Playwright not installed")
+        logger.info("Run: pip install playwright && playwright install chromium")
         all_ok = False
 
     # Check if port is available
@@ -116,10 +99,10 @@ def check_prerequisites():
     try:
         result = sock.connect_ex((SERVER_HOST, int(SERVER_PORT)))
         if result == 0:
-            log_warning(f"Port {SERVER_PORT} is already in use")
-            log_info("An existing server may be running")
+            logger.warning("⚠️ Port %s is already in use", SERVER_PORT)
+            logger.info("An existing server may be running")
         else:
-            log_success(f"Port {SERVER_PORT} is available")
+            logger.info("✅ Port %s is available", SERVER_PORT)
     finally:
         sock.close()
 
@@ -128,7 +111,7 @@ def check_prerequisites():
 
 def start_server():
     """Start ParkPartner server"""
-    log_info("Starting ParkPartner server...")
+    logger.info("Starting ParkPartner server...")
 
     # Ensure logs directory exists
     LOGS_DIR.mkdir(exist_ok=True)
@@ -155,11 +138,11 @@ def start_server():
         cwd=str(PROJECT_ROOT),
     )
 
-    log_info(f"Server PID: {process.pid}")
-    log_info(f"Log file: {log_file}")
+    logger.info(f"Server PID: {process.pid}")
+    logger.info(f"Log file: {log_file}")
 
     # Wait for server to be ready
-    log_info("Waiting for server to be ready...")
+    logger.info("Waiting for server to be ready...")
 
     import requests
 
@@ -169,20 +152,20 @@ def start_server():
         try:
             response = requests.get(HEALTH_URL, timeout=2)
             if response.status_code == 200:
-                log_success(f"Server is ready (attempt {attempt + 1}/{max_attempts})")
+                logger.info("✅ Server is ready (attempt {attempt + 1}/{max_attempts})")
                 return process
         except Exception:
             if attempt % 5 == 0:
-                log_info(f"  Still waiting... ({attempt + 1}/{max_attempts})")
+                logger.info(f"  Still waiting... ({attempt + 1}/{max_attempts})")
 
-    log_error("Server failed to start within timeout")
+    logger.error("❌ Server failed to start within timeout")
     process.terminate()
     return None
 
 
 def run_e2e_tests(server_process, args):
     """Run E2E tests"""
-    log_info("Running E2E tests...")
+    logger.info("Running E2E tests...")
 
     # Build pytest command
     base_url = f"http://{SERVER_HOST}:{SERVER_PORT}"
@@ -190,7 +173,7 @@ def run_e2e_tests(server_process, args):
         sys.executable,
         "-m",
         "pytest",
-        E2E_TEST_FILE,
+        *E2E_TEST_FILES,
         "-v",
         "--tb=short",
         f"--base-url={base_url}",
@@ -205,7 +188,7 @@ def run_e2e_tests(server_process, args):
     if args.test:
         cmd.append(f"-k {args.test}")
 
-    log_info(f"Running: {' '.join(cmd)}")
+    logger.info(f"Running: {' '.join(cmd)}")
 
     try:
         result = subprocess.run(
@@ -215,16 +198,16 @@ def run_e2e_tests(server_process, args):
         )
 
         if result.returncode == 0:
-            log_success("All E2E tests passed!")
+            logger.info("✅ All E2E tests passed!")
             return True
-        log_error(f"E2E tests failed with code {result.returncode}")
+        logger.error("❌ E2E tests failed with code {result.returncode}")
         return False
 
     except subprocess.TimeoutExpired:
-        log_error("E2E tests timed out (5 minutes)")
+        logger.error("❌ E2E tests timed out (5 minutes)")
         return False
     except Exception as e:
-        log_error(f"E2E tests error: {e}")
+        logger.error("❌ E2E tests error: {e}")
         return False
 
 
@@ -233,7 +216,7 @@ def stop_server(process):
     if process is None:
         return
 
-    log_info("Stopping server...")
+    logger.info("Stopping server...")
 
     try:
         # Try graceful shutdown first
@@ -242,20 +225,20 @@ def stop_server(process):
         # Wait for process to exit
         try:
             process.wait(timeout=10)
-            log_success("Server stopped gracefully")
+            logger.info("✅ Server stopped gracefully")
         except subprocess.TimeoutExpired:
-            log_warning("Server didn't stop gracefully, forcing...")
+            logger.warning("⚠️ Server didn't stop gracefully, forcing...")
             process.kill()
             process.wait()
-            log_success("Server force-killed")
+            logger.info("✅ Server force-killed")
 
     except Exception as e:
-        log_error(f"Error stopping server: {e}")
+        logger.error("❌ Error stopping server: {e}")
 
 
 def cleanup_all_processes():
     """Ensure all related processes are stopped"""
-    log_info("Cleaning up any remaining processes...")
+    logger.info("Cleaning up any remaining processes...")
 
     # Kill any process on our port
     try:
@@ -277,7 +260,7 @@ def cleanup_all_processes():
                 for pid in pids:
                     try:
                         os.kill(int(pid), signal.SIGTERM)
-                        log_info(f"Killed process {pid}")
+                        logger.info(f"Killed process {pid}")
                     except Exception:
                         pass
     except Exception:
@@ -294,7 +277,7 @@ def cleanup_all_processes():
     except Exception:
         pass
 
-    log_success("Cleanup complete")
+    logger.info("✅ Cleanup complete")
 
 
 def print_summary(tests_passed, duration):
@@ -356,24 +339,24 @@ def main():
     try:
         # Check prerequisites
         if not args.skip_checks and not check_prerequisites():
-            log_error("Prerequisites check failed")
+            logger.error("❌ Prerequisites check failed")
             sys.exit(1)
 
         # Start server
         server_process = start_server()
         if not server_process:
-            log_error("Failed to start server")
+            logger.error("❌ Failed to start server")
             sys.exit(1)
 
         # Run tests
         tests_passed = run_e2e_tests(server_process, args)
 
     except KeyboardInterrupt:
-        log_warning("Interrupted by user")
+        logger.warning("⚠️ Interrupted by user")
         tests_passed = False
 
     except Exception as e:
-        log_error(f"Unexpected error: {e}")
+        logger.error("❌ Unexpected error: {e}")
         tests_passed = False
 
     finally:

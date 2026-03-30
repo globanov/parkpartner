@@ -8,18 +8,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from app.adapters.api.routes import router
-from app.config import WHISPER_MODEL
+from app.config import WHISPER_MODEL, setup_logging
 from app.core.state import set_session_histories, set_whisper_model
 
-# Logging setup
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler("logs/parkpartner.log", encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
-)
+# Initialize centralized logging
+setup_logging("parkpartner", component_type="server", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 

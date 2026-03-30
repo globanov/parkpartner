@@ -45,57 +45,6 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture(scope="session")
-def browser_context():
-    """
-    Create browser context for E2E testing.
-
-    Sets up Chromium with proper audio permissions.
-    """
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,  # Set to False to see browser
-            args=[
-                "--use-fake-ui-for-media-stream",
-                "--use-fake-device-for-media-stream",
-            ],
-        )
-
-        context = browser.new_context(
-            viewport={"width": 375, "height": 667},  # iPhone SE size
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15",
-        )
-
-        yield context
-
-        context.close()
-        browser.close()
-
-
-@pytest.fixture
-def page(browser_context, base_url):
-    """
-    Create page for testing.
-
-    Navigates to application and waits for load.
-    """
-    page = browser_context.new_page()
-
-    # Navigate to app
-    page.goto(base_url, wait_until="networkidle")
-
-    # Wait for app to be interactive
-    page.wait_for_selector("#recordBtn", timeout=10000)
-
-    yield page
-
-    page.close()
-
-
-# Use pytest-base-url plugin's base_url fixture
-# Remove custom base_url fixture to avoid conflict
-
-
-@pytest.fixture(scope="session")
 def test_audio_path():
     """
     Path to test audio file for microphone input.

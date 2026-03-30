@@ -4,10 +4,22 @@ System test fixtures and configuration.
 System tests run against the actual application with real or stubbed external services.
 """
 
+import logging
 import os
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Import playwright for browser fixtures
+playwright = pytest.importorskip("playwright")
+from playwright.sync_api import sync_playwright
+
+# Configure system test logging
+from app.config import setup_logging
+
+setup_logging("system", component_type="system")
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="session")
@@ -104,3 +116,44 @@ def pytest_collection_modifyitems(config, items):
         # Add requires_services marker to tests that need it
         if "real" in item.name.lower() or "service" in item.name.lower():
             item.add_marker(pytest.mark.requires_services)
+
+
+@pytest.fixture(scope="session")
+def browser_context():
+    """
+    Create browser context for E2E testing.
+
+    Sets up Chromium with proper audio permissions.
+    """
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--use-fake-ui-for-media-stream",
+                "--use-fake-device-for-media-stream",
+            ],
+        )
+
+        context = browser.new_context(
+            viewport={"width": 375, "height": 667},
+            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15",
+        )
+
+        yield context
+
+        context.close()
+        browser.close()
+
+
+@pytest.fixture
+def page(browser_context, base_url):
+    """
+    Create page for testing.
+
+    Navigates to application and waits for load.
+    """
+    page = browser_context.new_page()
+    page.goto(base_url, wait_until="networkidle")
+    page.wait_for_selector("#recordBtn", timeout=10000)
+    yield page
+    page.close()
