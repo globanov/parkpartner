@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="session")
+def base_url():
+    """Return base URL for tests. Fallback if pytest-base-url not provided."""
+    import os
+
+    return os.environ.get("BASE_URL", "http://localhost:8000")
+
+
+@pytest.fixture(scope="session")
 def system_config():
     """Configuration for system tests"""
     return {
@@ -157,3 +165,96 @@ def page(browser_context, base_url):
     page.wait_for_selector("#recordBtn", timeout=10000)
     yield page
     page.close()
+
+
+@pytest.fixture
+def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_bytes):
+    """Page with real audio, parameterized by test mode."""
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+    # Get test mode from parametrize marker
+    test_mode = "localhost"
+    if hasattr(request.node, "callspec") and request.node.callspec:
+        test_mode = request.node.callspec.params.get("test_mode", "localhost")
+
+    # Only start tunnel for tunnel tests
+    tunnel_url = None
+    if test_mode == "tunnel":
+        import time
+
+        import requests
+
+        # Wait for server
+        for _ in range(30):
+            try:
+                if (
+                    requests.get("http://localhost:8000/health", timeout=2).status_code
+                    == 200
+                ):
+                    break
+            except Exception:
+                time.sleep(1)
+        # Start tunnel
+        from app.utils.tunnel import start_tunnel
+
+        tunnel_url = start_tunnel(8000)
+        logger.info(f"Tunnel started: {tunnel_url}")
+
+    target_url = tunnel_url if test_mode == "tunnel" else base_url
+    timeout = 15000 if test_mode == "tunnel" else 10000
+
+    page = browser_context.new_page()
+    audio_bytes_list = list(real_audio_bytes)
+
+    page.add_init_script(
+        """
+        (function(audioData) {
+            const OriginalMediaRecorder = window.MediaRecorder;
+            window.MediaRecorder = function(stream, options) {
+                const self = new OriginalMediaRecorder(stream, options);
+                const originalStart = self.start.bind(self);
+                const originalStop = self.stop.bind(self);
+                self.start = function(timeslice) {
+                    originalStart(timeslice);
+                    setTimeout(() => {
+                        if (self.ondataavailable) {
+                            const realAudioBlob = new Blob([new Uint8Array(audioData)], { type: 'audio/webm' });
+                            self.ondataavailable({ data: realAudioBlob });
+                        }
+                    }, 100);
+                };
+                self.stop = function() {
+                    originalStop();
+                    setTimeout(() => { if (self.onstop) self.onstop(); }, 200);
+                };
+                return self;
+            };
+        })({audio_bytes_list})
+        """.replace("{audio_bytes_list}", str(audio_bytes_list))
+    )
+
+    # Retry logic for tunnel
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            import sys
+
+            print(f"📡 NAVIGATING TO: {target_url}", file=sys.stderr, flush=True)
+            page.goto(target_url, wait_until="networkidle", timeout=timeout)
+            break
+        except PlaywrightTimeoutError:
+            if attempt < max_attempts - 1:
+                page.wait_for_timeout(2000)
+            else:
+                raise
+
+    page.wait_for_selector("#recordBtn", timeout=10000)
+    yield page
+    page.close()
+
+    # Cleanup tunnel if started
+    if test_mode == "tunnel" and tunnel_url:
+        from app.utils.tunnel import stop_tunnel
+
+        stop_tunnel()
+        logger.info("Tunnel stopped")

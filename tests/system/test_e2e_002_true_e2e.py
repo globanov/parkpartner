@@ -42,71 +42,6 @@ def real_audio_bytes():
     return audio_file.read_bytes()
 
 
-@pytest.fixture
-def e2e_page_with_real_audio(browser_context, base_url: str, real_audio_bytes: bytes):
-    """
-    Create page with REAL audio data injected.
-
-    Injects real audio bytes into browser context for MediaRecorder to use.
-    """
-    page = browser_context.new_page()
-
-    # Convert bytes to list for JavaScript injection
-    audio_bytes_list = list(real_audio_bytes)
-
-    # Inject mock MediaRecorder with REAL audio data
-    page.add_init_script(
-        """
-        (function(audioData) {
-            const OriginalMediaRecorder = window.MediaRecorder;
-
-            window.MediaRecorder = function(stream, options) {
-                const self = new OriginalMediaRecorder(stream, options);
-                const originalStart = self.start.bind(self);
-                const originalStop = self.stop.bind(self);
-
-                self.start = function(timeslice) {
-                    originalStart(timeslice);
-
-                    // Use REAL audio data from injected bytes
-                    setTimeout(() => {
-                        if (self.ondataavailable) {
-                            // Create Blob from real audio bytes
-                            const realAudioBlob = new Blob(
-                                [new Uint8Array(audioData)],
-                                { type: 'audio/webm' }
-                            );
-                            const event = { data: realAudioBlob };
-                            self.ondataavailable(event);
-                        }
-                    }, 100);
-                };
-
-                self.stop = function() {
-                    originalStop();
-
-                    setTimeout(() => {
-                        if (self.onstop) {
-                            self.onstop();
-                        }
-                    }, 200);
-                };
-
-                return self;
-            };
-        })({audio_bytes_list})
-        """.replace("{audio_bytes_list}", str(audio_bytes_list))
-    )
-
-    # Navigate with explicit timeout
-    page.goto(base_url, wait_until="networkidle", timeout=10000)
-    page.wait_for_selector("#recordBtn", timeout=10000)
-
-    yield page
-
-    page.close()
-
-
 def _log_step(step_name: str):
     """Log step with timestamp for debugging"""
     timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
@@ -129,12 +64,13 @@ class TestE2E_TrueVoiceConversation:
     @pytest.mark.requires_services
     @pytest.mark.browser
     @pytest.mark.smoke
-    @pytest.mark.timeout(60)  # Fail if test exceeds 60 seconds
+    @pytest.mark.timeout(90)
+    @pytest.mark.parametrize("test_mode", ["localhost", "tunnel"])
     def test_complete_user_journey_with_real_audio(  # noqa: PLR0915
-        self, e2e_page_with_real_audio: Page
+        self, e2e_page_with_real_audio: Page, test_mode: str
     ):
         """
-        Complete user journey with REAL audio:
+        Complete user journey with REAL audio (parameterized):
         1. Open browser
         2. Click hold-to-talk
         3. Release (sends real audio)
@@ -146,7 +82,7 @@ class TestE2E_TrueVoiceConversation:
         start_time = datetime.now()
 
         print("\n" + "=" * 60)
-        print("🎬 E2E-002: TRUE End-to-End Test (REAL Audio)")
+        print(f"🎬 E2E-002: TRUE End-to-End Test ({test_mode.upper()})")
         print("=" * 60)
         _log_step(f"Test started at {start_time.strftime('%H:%M:%S')}")
 
