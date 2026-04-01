@@ -4,7 +4,6 @@
 
 ```bash
 python run_e2e_tests.py -v  # Recommended - auto server management
-./run_e2e_tests.sh -v       # macOS/Linux only
 ```
 
 ## Scripts
@@ -12,7 +11,7 @@ python run_e2e_tests.py -v  # Recommended - auto server management
 | Script | Purpose |
 |--------|---------|
 | `python parkpartner.py` | Start server (http://localhost:8000) |
-| `./start_parkpartner_with_tunnel.sh` | Server + HTTPS tunnel |
+| `python start_parkpartner_with_tunnel.py` | Server + HTTPS tunnel |
 | `python run_e2e_tests.py` | E2E tests with auto server management |
 
 ---

@@ -41,7 +41,7 @@ Open http://localhost:8000
 ### Mobile Access (HTTPS)
 
 ```bash
-./start_parkpartner_with_tunnel.sh
+python start_parkpartner_with_tunnel.py
 ```
 
 Copy the https://*.localhost.run URL to access from iPhone.

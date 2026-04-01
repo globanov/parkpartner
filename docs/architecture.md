@@ -56,7 +56,7 @@ flowchart TD
 ```
 parkpartner/
 ├── parkpartner.py        # FastAPI application entry point
-├── start_parkpartner_with_tunnel.sh  # Shell script for server + tunnel
+├── start_parkpartner_with_tunnel.py  # Python script for server + tunnel
 ├── app/
 │   ├── adapters/           # External service implementations
 │   │   ├── api/            # HTTP API routes

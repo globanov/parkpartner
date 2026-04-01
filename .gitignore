@@ -39,3 +39,4 @@ tmp/
 # Caches at root level
 .pytest_cache/
 .ruff_cache/
+.sonar/
