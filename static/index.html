@@ -92,6 +92,7 @@
     let mediaRecorder = null;
     let audioChunks = [];
     let isRecording = false;
+    let isPermissionPending = false;
 
     // Show warning if accessed via 0.0.0.0 (microphone won't work)
     if (window.location.hostname === '0.0.0.0' || window.location.hostname === '') {
@@ -122,9 +123,13 @@
         }
 
         audioChunks = [];
+        isPermissionPending = true;
+        status.textContent = '🎤 Запрос разрешения...';
+        status.className = 'status';
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            isPermissionPending = false;
             mediaRecorder = new MediaRecorder(stream);
 
             mediaRecorder.ondataavailable = (e) => {
@@ -146,13 +151,18 @@
             status.textContent = '🔴 Recording...';
             status.className = 'status';
         } catch (err) {
-            status.textContent = '❌ Mic error: ' + err.message;
+            isPermissionPending = false;
+            status.textContent = '❌ Нет доступа к микрофону';
             status.className = 'status error';
             console.error('Microphone error:', err);
         }
     }
 
     function stopRecording() {
+        if (isPermissionPending) {
+            console.log('Permission pending, ignore touchend');
+            return;
+        }
         if (mediaRecorder && isRecording) {
             mediaRecorder.stop();
             isRecording = false;
