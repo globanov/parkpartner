@@ -131,6 +131,7 @@ OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_MODEL = "qwen2.5:3b"
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 150
+LLM_TIMEOUT = 30
 
 # TTS
 TTS_VOICE = "ru-RU-DmitryNeural"

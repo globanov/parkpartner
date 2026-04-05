@@ -12,7 +12,7 @@ python run_e2e_tests.py -v  # Recommended - auto server management
 |--------|---------|
 | `python parkpartner.py` | Start server (http://localhost:8000) |
 | `python start_parkpartner_with_tunnel.py` | Server + HTTPS tunnel |
-| `python run_e2e_tests.py` | E2E tests with auto server management |
+| `python run_e2e_tests.py` | E2E tests with auto server management (includes browser-only + full E2E) |
 
 ---
 
@@ -220,7 +220,7 @@ python run_e2e_tests.py -v
 # True E2E test (browser + server)
 pytest tests/system/test_e2e_002_true_e2e.py -v -s
 
-# Browser UI tests only
+# Browser UI tests only (no server audio processing)
 pytest tests/system/test_e2e_001_browser.py -v -s
 
 # API tests only

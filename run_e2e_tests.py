@@ -152,7 +152,9 @@ def start_server():
         try:
             response = requests.get(HEALTH_URL, timeout=2)
             if response.status_code == 200:
-                logger.info("✅ Server is ready (attempt {attempt + 1}/{max_attempts})")
+                logger.info(
+                    f"✅ Server is ready (attempt {attempt + 1}/{max_attempts})"
+                )
                 return process
         except Exception:
             if attempt % 5 == 0:
@@ -200,14 +202,14 @@ def run_e2e_tests(server_process, args):
         if result.returncode == 0:
             logger.info("✅ All E2E tests passed!")
             return True
-        logger.error("❌ E2E tests failed with code {result.returncode}")
+        logger.error(f"❌ E2E tests failed with code {result.returncode}")
         return False
 
     except subprocess.TimeoutExpired:
         logger.error("❌ E2E tests timed out (5 minutes)")
         return False
     except Exception as e:
-        logger.error("❌ E2E tests error: {e}")
+        logger.error(f"❌ E2E tests error: {e}")
         return False
 
 
@@ -233,7 +235,7 @@ def stop_server(process):
             logger.info("✅ Server force-killed")
 
     except Exception as e:
-        logger.error("❌ Error stopping server: {e}")
+        logger.error(f"❌ Error stopping server: {e}")
 
 
 def cleanup_all_processes():
@@ -356,7 +358,7 @@ def main():
         tests_passed = False
 
     except Exception as e:
-        logger.error("❌ Unexpected error: {e}")
+        logger.error(f"❌ Unexpected error: {e}")
         tests_passed = False
 
     finally:
