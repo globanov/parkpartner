@@ -167,45 +167,74 @@ def page(browser_context, base_url):
     page.close()
 
 
-@pytest.fixture
-def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_bytes):
-    """Page with real audio, parameterized by test mode."""
-    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+# ── Helpers for e2e_page_with_real_audio ──────────────────────────────
 
-    # Get test mode from parametrize marker
-    test_mode = "localhost"
+
+def _get_test_mode(request):
+    """Extract test mode from parametrize marker."""
     if hasattr(request.node, "callspec") and request.node.callspec:
-        test_mode = request.node.callspec.params.get("test_mode", "localhost")
+        return request.node.callspec.params.get("test_mode", "localhost")
+    return "localhost"
 
-    # Only start tunnel for tunnel tests
-    tunnel_url = None
-    if test_mode == "tunnel":
-        import time
 
-        import requests
+def _wait_for_server():
+    """Wait for server to be healthy."""
+    import time
 
-        # Wait for server
-        for _ in range(30):
-            try:
-                if (
-                    requests.get("http://localhost:8000/health", timeout=2).status_code
-                    == 200
-                ):
-                    break
-            except Exception:
-                time.sleep(1)
-        # Start tunnel
-        from app.utils.tunnel import start_tunnel
+    import requests
 
-        tunnel_url = start_tunnel(8000)
-        logger.info(f"Tunnel started: {tunnel_url}")
+    for _ in range(30):
+        try:
+            if (
+                requests.get("http://localhost:8000/health", timeout=2).status_code
+                == 200
+            ):
+                return
+        except Exception:
+            time.sleep(1)
 
-    target_url = tunnel_url if test_mode == "tunnel" else base_url
-    timeout = 15000 if test_mode == "tunnel" else 10000
 
-    page = browser_context.new_page()
-    audio_bytes_list = list(real_audio_bytes)
+def _start_tunnel():
+    """Start tunnel and return URL."""
+    _wait_for_server()
+    from app.utils.tunnel import start_tunnel
 
+    url = start_tunnel(8000)
+    logger.info("Tunnel started: %s", url)
+    return url
+
+
+def _setup_console_capture(page):
+    """Attach console listener, return (log_path, messages_list)."""
+    from datetime import datetime
+
+    console_log_path = (
+        Path("logs") / f"browser_console_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    )
+    console_log_path.parent.mkdir(parents=True, exist_ok=True)
+    console_messages = []
+
+    def _handle_console(msg):
+        text = msg.text
+        console_messages.append(text)
+        with open(console_log_path, "a") as f:
+            f.write(
+                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]} {msg.type}: {text}\n"
+            )
+
+    page.on("console", _handle_console)
+    page.on(
+        "pageerror",
+        lambda err: _handle_console(
+            type="error", msg=type("M", (), {"text": str(err), "type": "error"})()
+        ),
+    )
+    return console_log_path, console_messages
+
+
+def _inject_audio_mock(page, audio_bytes):
+    """Inject MediaRecorder mock that replaces audio with test data."""
+    audio_bytes_list = list(audio_bytes)
     page.add_init_script(
         """
         (function(audioData) {
@@ -225,7 +254,6 @@ def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_byte
                 };
                 self.stop = function() {
                     originalStop();
-                    setTimeout(() => { if (self.onstop) self.onstop(); }, 200);
                 };
                 return self;
             };
@@ -233,7 +261,11 @@ def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_byte
         """.replace("{audio_bytes_list}", str(audio_bytes_list))
     )
 
-    # Retry logic for tunnel
+
+def _navigate_to_app(page, target_url, timeout):
+    """Navigate to app with retry logic."""
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
     max_attempts = 3
     for attempt in range(max_attempts):
         try:
@@ -241,20 +273,54 @@ def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_byte
 
             print(f"📡 NAVIGATING TO: {target_url}", file=sys.stderr, flush=True)
             page.goto(target_url, wait_until="networkidle", timeout=timeout)
-            break
+            return
         except PlaywrightTimeoutError:
             if attempt < max_attempts - 1:
                 page.wait_for_timeout(2000)
             else:
                 raise
 
-    page.wait_for_selector("#recordBtn", timeout=10000)
-    yield page
-    page.close()
 
-    # Cleanup tunnel if started
+def _print_console_summary(console_log_path, console_messages):
+    """Print captured console messages after test."""
+    print(f"\n📄 Console log saved to: {console_log_path}")
+    if console_messages:
+        print("\n📋 Last 20 browser console messages:")
+        for msg in console_messages[-20:]:
+            print(f"   {msg}")
+    else:
+        print("   (no console messages captured)")
+
+
+def _cleanup_tunnel(tunnel_url, test_mode):
+    """Stop tunnel if it was started."""
     if test_mode == "tunnel" and tunnel_url:
         from app.utils.tunnel import stop_tunnel
 
         stop_tunnel()
         logger.info("Tunnel stopped")
+
+
+# ── Main fixture ──────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_bytes):
+    """Page with real audio, parameterized by test mode."""
+    test_mode = _get_test_mode(request)
+
+    tunnel_url = _start_tunnel() if test_mode == "tunnel" else None
+    target_url = tunnel_url if test_mode == "tunnel" else base_url
+    timeout = 15000 if test_mode == "tunnel" else 10000
+
+    page = browser_context.new_page()
+    console_log_path, console_messages = _setup_console_capture(page)
+    _inject_audio_mock(page, real_audio_bytes)
+    _navigate_to_app(page, target_url, timeout)
+    page.wait_for_selector("#recordBtn", timeout=10000)
+
+    yield page
+    page.close()
+
+    _print_console_summary(console_log_path, console_messages)
+    _cleanup_tunnel(tunnel_url, test_mode)

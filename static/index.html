@@ -174,6 +174,7 @@
     }
 
     async function sendAudio() {
+        console.log('[SEND] sendAudio() called');
         // iOS fix: check if we have audio data
         if (audioChunks.length === 0) {
             status.textContent = '❌ No audio recorded - try again';
@@ -184,6 +185,7 @@
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
 
         try {
+            console.log('[FETCH] POST /process starting');
             status.innerHTML = '<span class="spinner"></span> Processing...';
             const formData = new FormData();
             formData.append('file', audioBlob, 'recording.webm');
@@ -200,6 +202,7 @@
 
             const audioBlobResponse = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlobResponse);
+            console.log('[FETCH] POST /process completed');
 
             addMessage('user', '🎤 Voice message sent');
             playAudioResponse(audioUrl);
@@ -217,16 +220,19 @@
         audio.playsInline = true;
 
         const tryPlay = () => {
+            console.log('[AUDIO] play() called');
             audio.play()
                 .then(() => {
+                    console.log('[AUDIO] play() success');
                     status.textContent = '✅ Response playing...';
                     status.className = 'status success';
                 })
                 .catch(err => {
-                    console.log('Autoplay blocked:', err);
+                    console.error('[AUDIO] play() failed:', err);
                     status.innerHTML = `🔊 Response ready<br><button class="play-btn" id="playBtn">▶️ Play</button>`;
                     status.className = 'status success';
                     document.getElementById('playBtn').onclick = () => {
+                        console.log('[AUDIO] play() retry (manual)');
                         audio.play();
                         status.textContent = '✅ Playing...';
                     };
