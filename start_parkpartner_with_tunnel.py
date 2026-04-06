@@ -12,6 +12,7 @@ Stop:
 import signal
 import subprocess
 import sys
+import time
 
 from app.utils.server import is_port_in_use, start_server, wait_for_server
 from app.utils.tunnel import TunnelManager
@@ -71,12 +72,12 @@ def main():
     print("🔗 Starting localhost.run tunnel...")
     try:
         with TunnelManager(port=PORT) as tunnel_url:
-            print(f"🔗 Tunnel URL: {tunnel_url}")
-            print()
-            print("Press Ctrl+C to stop")
+            if tunnel_url is None:
+                print("❌ Tunnel failed to start — check localhost.run output")
+                cleanup()
+            print(f"\r🔗 Tunnel URL: {tunnel_url}")
+            print("\rPress Ctrl+C to stop")
             while True:
-                import time
-
                 time.sleep(1)
     except KeyboardInterrupt:
         cleanup()

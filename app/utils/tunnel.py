@@ -41,13 +41,15 @@ def stop_tunnel() -> None:
 
 
 def _extract_url(line: str) -> str | None:
-    """Extract HTTPS URL from localhost.run output."""
-    # Match tunnel URLs: https://*.localhost.run or https://*.lhr.life
-    # Exclude admin URLs
-    match = re.search(
-        r"https://(?!admin)[a-zA-Z0-9.-]+\.(localhost\.run|lhr\.life)", line
-    )
-    return match.group(0) if match else None
+    """Extract tunnel URL from a pre-cleaned localhost.run output line.
+
+    Only matches lines containing the signal phrase:
+    "tunneled with tls termination".
+    """
+    if "tunneled with tls termination" not in line:
+        return None
+    match = re.search(r"https://[a-zA-Z0-9.-]+\.(lhr\.life|localhost\.run)", line)
+    return match.group(0).rstrip("],;)'\" ") if match else None
 
 
 class TunnelManager:
@@ -58,6 +60,7 @@ class TunnelManager:
         self.timeout = timeout
         self.process = None
         self.tunnel_url = None
+        self._error_banner = ""
 
     def __enter__(self) -> str:
         self.process = subprocess.Popen(
@@ -72,7 +75,11 @@ class TunnelManager:
                 raise RuntimeError(f"Tunnel exited: {self.process.returncode}")
             line = self.process.stdout.readline().strip()
             if line:
-                print(line)
+                # Strip ANSI escape codes and non-printable characters
+                line = re.sub(r"[\x1b\x00-\x1F\x7F-\x9F]+", "", line)
+                line = line.replace("\r", "")
+                self._error_banner += line + "\n"
+
                 if url := _extract_url(line):
                     elapsed = time.time() - start_time
                     logger.info(f"Tunnel ready: {url} ({elapsed:.1f}s)")
