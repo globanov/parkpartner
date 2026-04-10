@@ -9,10 +9,13 @@ Stop:
     Press Ctrl+C
 """
 
+import io
 import signal
 import subprocess
 import sys
 import time
+
+import qrcode
 
 from app.utils.server import is_port_in_use, start_server, wait_for_server
 from app.utils.tunnel import TunnelManager
@@ -22,6 +25,18 @@ PORT = 8000
 
 # Global reference for cleanup
 server_process = None
+
+
+def _print_qr_code(url: str) -> None:
+    """Generate and print ASCII QR code for tunnel URL."""
+    qr = qrcode.QRCode(border=1, box_size=1)
+    qr.add_data(url)
+    qr.make(fit=True)
+    buf = io.StringIO()
+    qr.print_ascii(out=buf, invert=True)
+    print("\n\r📱 Scan for mobile access:")
+    for line in buf.getvalue().splitlines():
+        print(f"\r{line}")
 
 
 def cleanup(signum=None, frame=None):
@@ -76,6 +91,10 @@ def main():
                 print("❌ Tunnel failed to start — check localhost.run output")
                 cleanup()
             print(f"\r🔗 Tunnel URL: {tunnel_url}")
+
+            if tunnel_url:
+                _print_qr_code(tunnel_url)
+
             print("\rPress Ctrl+C to stop")
             while True:
                 time.sleep(1)

@@ -6,6 +6,7 @@ System tests run against the actual application with real or stubbed external se
 
 import logging
 import os
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -194,14 +195,15 @@ def _wait_for_server():
             time.sleep(1)
 
 
+@contextmanager
 def _start_tunnel():
-    """Start tunnel and return URL."""
+    """Start tunnel as a proper context manager."""
     _wait_for_server()
-    from app.utils.tunnel import start_tunnel
+    from app.utils.tunnel import TunnelManager
 
-    url = start_tunnel(8000)
-    logger.info("Tunnel started: %s", url)
-    return url
+    with TunnelManager(port=8000) as tm:
+        logger.info("Tunnel started: %s", tm.tunnel_url)
+        yield tm
 
 
 def _setup_console_capture(page):
@@ -292,27 +294,11 @@ def _print_console_summary(console_log_path, console_messages):
         print("   (no console messages captured)")
 
 
-def _cleanup_tunnel(tunnel_url, test_mode):
-    """Stop tunnel if it was started."""
-    if test_mode == "tunnel" and tunnel_url:
-        from app.utils.tunnel import stop_tunnel
-
-        stop_tunnel()
-        logger.info("Tunnel stopped")
-
-
 # ── Main fixture ──────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_bytes):
-    """Page with real audio, parameterized by test mode."""
-    test_mode = _get_test_mode(request)
-
-    tunnel_url = _start_tunnel() if test_mode == "tunnel" else None
-    target_url = tunnel_url if test_mode == "tunnel" else base_url
-    timeout = 15000 if test_mode == "tunnel" else 10000
-
+def _run_e2e_page(browser_context, target_url, timeout, real_audio_bytes):
+    """Common page setup and teardown for E2E tests."""
     page = browser_context.new_page()
     console_log_path, console_messages = _setup_console_capture(page)
     _inject_audio_mock(page, real_audio_bytes)
@@ -323,4 +309,17 @@ def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_byte
     page.close()
 
     _print_console_summary(console_log_path, console_messages)
-    _cleanup_tunnel(tunnel_url, test_mode)
+
+
+@pytest.fixture
+def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_bytes):
+    """Page with real audio, parameterized by test mode."""
+    test_mode = _get_test_mode(request)
+
+    if test_mode == "tunnel":
+        with _start_tunnel() as tunnel_manager:
+            yield from _run_e2e_page(
+                browser_context, tunnel_manager.tunnel_url, 15000, real_audio_bytes
+            )
+    else:
+        yield from _run_e2e_page(browser_context, base_url, 10000, real_audio_bytes)

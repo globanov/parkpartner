@@ -1,43 +1,16 @@
-"""Minimal tunnel management for ParkPartner."""
+"""Minimal tunnel management for ParkPartner.
+
+Single entry point: use `TunnelManager` as a context manager.
+"""
 
 import logging
 import re
 import subprocess
 import time
 
+from app.config import get_log_filepath
+
 logger = logging.getLogger(__name__)
-_tunnel_process: subprocess.Popen | None = None
-
-
-def start_tunnel(port: int) -> str:
-    """Start localhost.run tunnel, return URL."""
-    global _tunnel_process
-    logger.info(f"Starting tunnel on port {port}...")
-
-    _tunnel_process = subprocess.Popen(
-        ["ssh", "-R", f"80:localhost:{port}", "nokey@localhost.run"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-
-    while True:
-        line = _tunnel_process.stdout.readline().strip()
-        if line:
-            print(line)
-            if url := _extract_url(line):
-                logger.info(f"Tunnel ready: {url}")
-                return url
-
-
-def stop_tunnel() -> None:
-    """Stop tunnel process."""
-    global _tunnel_process
-    if _tunnel_process:
-        logger.info("Stopping tunnel...")
-        _tunnel_process.terminate()
-        _tunnel_process.wait()
-        _tunnel_process = None
 
 
 def _extract_url(line: str) -> str | None:
@@ -61,6 +34,7 @@ class TunnelManager:
         self.process = None
         self.tunnel_url = None
         self._error_banner = ""
+        self._raw_output = ""
 
     def __enter__(self) -> str:
         self.process = subprocess.Popen(
@@ -73,10 +47,13 @@ class TunnelManager:
         while True:
             if self.process.poll() is not None:
                 raise RuntimeError(f"Tunnel exited: {self.process.returncode}")
-            line = self.process.stdout.readline().strip()
-            if line:
+            raw_line = self.process.stdout.readline().strip()
+            if raw_line:
+                # Save raw line before stripping (for logging)
+                self._raw_output += raw_line + "\n"
+
                 # Strip ANSI escape codes and non-printable characters
-                line = re.sub(r"[\x1b\x00-\x1F\x7F-\x9F]+", "", line)
+                line = re.sub(r"[\x1b\x00-\x1F\x7F-\x9F]+", "", raw_line)
                 line = line.replace("\r", "")
                 self._error_banner += line + "\n"
 
@@ -90,6 +67,12 @@ class TunnelManager:
             time.sleep(0.1)
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        # Log full session output before cleanup
+        if self._raw_output:
+            log_path = get_log_filepath("tunnel", "tunnel")
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(self._raw_output)
+
         if self.process:
             logger.info("Stopping tunnel...")
             self.process.terminate()

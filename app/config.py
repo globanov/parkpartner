@@ -43,6 +43,7 @@ BASE_LOGS_DIR = Path(__file__).parent.parent / "logs"
 # Component type to subdirectory mapping
 LOG_SUBDIRS = {
     "server": "server",
+    "tunnel": "tunnel",
     "system": "tests/system",
     "integration": "tests/integration",
     "unit": "tests/unit",
