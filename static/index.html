@@ -142,7 +142,35 @@
 
     // ── Microphone permission ────────────────────────────────────
     const micModal = document.getElementById('micModal');
-    const btnAllow = document.getElementById('btnAllow');
+    const ORIGINAL_MODAL_HTML = micModal.innerHTML;
+
+    function showDenialMessage() {
+        micModal.innerHTML = `
+            <div class="modal-box">
+                <h3>🎤❌ Нет доступа к микрофону</h3>
+                <p>Без доступа к микрофону Партнёр По Парку Вас не услышит</p>
+                <button id="btnDenialOk" class="btn-allow">OK</button>
+            </div>
+        `;
+        document.getElementById('btnDenialOk').addEventListener('click', () => {
+            micModal.innerHTML = ORIGINAL_MODAL_HTML;
+            document.getElementById('btnAllow').addEventListener('click', btnAllowHandler);
+        });
+    }
+
+    function btnAllowHandler() {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                stream.getTracks().forEach(t => t.stop());
+                micModal.style.display = 'none';
+                micPermissionGranted = true;
+                console.log('[MIC] Permission granted via modal');
+            })
+            .catch(err => {
+                console.error('[MIC] Permission denied:', err);
+                showDenialMessage();
+            });
+    }
 
     // Try auto-grant (works in headless Chrome with --use-fake-ui-for-media-stream)
     (async () => {
@@ -157,18 +185,7 @@
         }
     })();
 
-    btnAllow.addEventListener('click', async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(t => t.stop());
-            micModal.style.display = 'none';
-            micPermissionGranted = true;
-            console.log('[MIC] Permission granted via modal');
-        } catch (err) {
-            console.error('[MIC] Permission denied:', err);
-            alert('Разрешите микрофон в настройках Safari → Settings → ParkPartner');
-        }
-    });
+    document.getElementById('btnAllow').addEventListener('click', btnAllowHandler);
 
     // ── Recording ────────────────────────────────────────────────
     async function startRecording() {
