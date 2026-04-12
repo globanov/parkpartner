@@ -67,10 +67,41 @@
             display: none;
         }
         .localhost-warning a { color: #f1c40f; text-decoration: underline; }
+
+        /* ── Microphone permission modal ── */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000; padding: 20px;
+        }
+        .modal-box {
+            background: #2a2a4a; border-radius: 16px;
+            padding: 30px 24px; max-width: 300px; width: 100%;
+            text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .modal-box h3 { font-size: 18px; margin-bottom: 12px; }
+        .modal-box p { font-size: 14px; color: #aaa; margin-bottom: 24px; line-height: 1.5; }
+        .btn-allow {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: #fff; border: none; border-radius: 12px;
+            padding: 14px 32px; font-size: 16px; font-weight: 600;
+            cursor: pointer; width: 100%;
+        }
+        .btn-allow:active { transform: scale(0.97); }
     </style>
 </head>
 <body>
 <div class="container">
+    <!-- Microphone permission modal -->
+    <div id="micModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>🎤 Доступ к микрофону</h3>
+            <p>Для голосового ввода нужен доступ к микрофону.<br>Нажмите «Разрешить» и подтвердите в Safari.</p>
+            <button id="btnAllow" class="btn-allow">Разрешить</button>
+        </div>
+    </div>
+
     <div id="localhostWarning" class="localhost-warning">
         ⚠️ <strong>Use localhost for microphone access</strong><br>
         <small>Click here: <a href="http://localhost:8000">localhost:8000</a></small>
@@ -89,59 +120,86 @@
     const status = document.getElementById('status');
     const conversation = document.getElementById('conversation');
     const localhostWarning = document.getElementById('localhostWarning');
+
+    // State
     let mediaRecorder = null;
+    let activeStream = null;
     let audioChunks = [];
     let isRecording = false;
-    let isPermissionPending = false;
+    let micPermissionGranted = false;
 
-    // Show warning if accessed via 0.0.0.0 (microphone won't work)
+    // Debug: enable with ?debug=true
+    const DEBUG = new URLSearchParams(window.location.search).has('debug');
+
+    function debugLog(...args) {
+        if (DEBUG) console.log('[DEBUG]', ...args);
+    }
+
+    // Show warning if accessed via 0.0.0.0
     if (window.location.hostname === '0.0.0.0' || window.location.hostname === '') {
         localhostWarning.style.display = 'block';
-        console.warn('Accessed via 0.0.0.0 - microphone requires localhost or HTTPS');
     }
 
-    // Check if MediaDevices API is available
-    function checkMediaDevices() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            status.innerHTML = '❌ Microphone not available<br><small>Use HTTPS or localhost</small>';
-            status.className = 'status error';
-            recordBtn.disabled = true;
-            console.error('MediaDevices API not available - requires HTTPS or localhost');
-            return false;
+    // ── Microphone permission ────────────────────────────────────
+    const micModal = document.getElementById('micModal');
+    const btnAllow = document.getElementById('btnAllow');
+
+    // Try auto-grant (works in headless Chrome with --use-fake-ui-for-media-stream)
+    (async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(t => t.stop());
+            micPermissionGranted = true;
+            console.log('[MIC] Auto-granted (headless/test mode)');
+        } catch {
+            // Real browser — show modal for user gesture
+            micModal.style.display = 'flex';
         }
-        return true;
-    }
+    })();
 
-    // Check on page load
-    checkMediaDevices();
+    btnAllow.addEventListener('click', async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(t => t.stop());
+            micModal.style.display = 'none';
+            micPermissionGranted = true;
+            console.log('[MIC] Permission granted via modal');
+        } catch (err) {
+            console.error('[MIC] Permission denied:', err);
+            alert('Разрешите микрофон в настройках Safari → Settings → ParkPartner');
+        }
+    });
 
-    // iOS fix: create new stream for EACH recording
+    // ── Recording ────────────────────────────────────────────────
     async function startRecording() {
-        // Double-check before recording
-        if (!checkMediaDevices()) {
+        if (!micPermissionGranted) {
+            alert('Сначала разрешите микрофон');
             return;
         }
 
         audioChunks = [];
-        isPermissionPending = true;
-        status.textContent = '🎤 Запрос разрешения...';
-        status.className = 'status';
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            isPermissionPending = false;
+            activeStream = stream;
             mediaRecorder = new MediaRecorder(stream);
 
             mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    audioChunks.push(e.data);
-                }
+                if (e.data.size > 0) audioChunks.push(e.data);
             };
 
             mediaRecorder.onstop = () => {
-                // Release microphone after recording
-                stream.getTracks().forEach(track => track.stop());
+                if (activeStream) {
+                    activeStream.getTracks().forEach(t => t.stop());
+                    activeStream = null;
+                }
                 sendAudio();
+            };
+
+            mediaRecorder.onerror = (e) => {
+                console.error('[REC] Error:', e.error);
+                status.textContent = '❌ Ошибка записи';
+                status.className = 'status error';
             };
 
             mediaRecorder.start();
@@ -150,50 +208,46 @@
             recordBtn.innerHTML = '<span class="icon">🔴</span><br>Recording...';
             status.textContent = '🔴 Recording...';
             status.className = 'status';
+            debugLog('Recording started');
         } catch (err) {
-            isPermissionPending = false;
+            micPermissionGranted = false;
+            activeStream = null;
             status.textContent = '❌ Нет доступа к микрофону';
             status.className = 'status error';
-            console.error('Microphone error:', err);
+            console.error('[REC] Error:', err);
         }
     }
 
     function stopRecording() {
-        if (isPermissionPending) {
-            console.log('Permission pending, ignore touchend');
-            return;
-        }
-        if (mediaRecorder && isRecording) {
+        if (!isRecording) return;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             mediaRecorder.stop();
             isRecording = false;
             recordBtn.classList.remove('recording');
             recordBtn.innerHTML = '<span class="icon">🎤</span><br>Hold to Talk';
             status.textContent = '⏳ Processing...';
             status.className = 'status';
+            debugLog('Recording stopped');
         }
     }
 
     async function sendAudio() {
-        console.log('[SEND] sendAudio() called');
-        // iOS fix: check if we have audio data
         if (audioChunks.length === 0) {
-            status.textContent = '❌ No audio recorded - try again';
+            status.textContent = '❌ Нет записи — попробуйте ещё раз';
             status.className = 'status error';
+            console.warn('[SEND] No audio chunks');
             return;
         }
 
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunks, { type: audioChunks[0]?.type || 'audio/webm' });
+        debugLog('Blob size:', audioBlob.size);
 
         try {
-            console.log('[FETCH] POST /process starting');
             status.innerHTML = '<span class="spinner"></span> Processing...';
             const formData = new FormData();
             formData.append('file', audioBlob, 'recording.webm');
 
-            const response = await fetch('/process', {
-                method: 'POST',
-                body: formData
-            });
+            const response = await fetch('/process', { method: 'POST', body: formData });
 
             if (!response.ok) {
                 const error = await response.json();
@@ -202,44 +256,36 @@
 
             const audioBlobResponse = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlobResponse);
-            console.log('[FETCH] POST /process completed');
 
             addMessage('user', '🎤 Voice message sent');
             playAudioResponse(audioUrl);
         } catch (err) {
             status.textContent = `❌ Error: ${err.message}`;
             status.className = 'status error';
-            console.error('Send error:', err);
+            console.error('[SEND] Error:', err);
         }
     }
 
-    // iOS-compatible audio playback
+    // ── Audio playback ───────────────────────────────────────────
     function playAudioResponse(audioUrl) {
         const audio = new Audio(audioUrl);
         audio.preload = 'auto';
         audio.playsInline = true;
 
-        const tryPlay = () => {
-            console.log('[AUDIO] play() called');
-            audio.play()
-                .then(() => {
-                    console.log('[AUDIO] play() success');
-                    status.textContent = '✅ Response playing...';
-                    status.className = 'status success';
-                })
-                .catch(err => {
-                    console.error('[AUDIO] play() failed:', err);
-                    status.innerHTML = `🔊 Response ready<br><button class="play-btn" id="playBtn">▶️ Play</button>`;
-                    status.className = 'status success';
-                    document.getElementById('playBtn').onclick = () => {
-                        console.log('[AUDIO] play() retry (manual)');
-                        audio.play();
-                        status.textContent = '✅ Playing...';
-                    };
-                });
-        };
-
-        tryPlay();
+        audio.play()
+            .then(() => {
+                status.textContent = '✅ Response playing...';
+                status.className = 'status success';
+            })
+            .catch(err => {
+                console.error('[AUDIO] play() failed:', err);
+                status.innerHTML = `🔊 Response ready<br><button class="play-btn" id="playBtn">▶️ Play</button>`;
+                status.className = 'status success';
+                document.getElementById('playBtn').onclick = () => {
+                    audio.play();
+                    status.textContent = '✅ Playing...';
+                };
+            });
 
         audio.onended = () => {
             if (!status.innerHTML.includes('play-btn')) {
@@ -258,7 +304,7 @@
         conversation.scrollTop = conversation.scrollHeight;
     }
 
-    // Event listeners
+    // ── Event listeners ──────────────────────────────────────────
     recordBtn.addEventListener('mousedown', startRecording);
     recordBtn.addEventListener('mouseup', stopRecording);
     recordBtn.addEventListener('mouseleave', () => { if (isRecording) stopRecording(); });

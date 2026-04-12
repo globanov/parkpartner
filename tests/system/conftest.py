@@ -197,13 +197,13 @@ def _wait_for_server():
 
 @contextmanager
 def _start_tunnel():
-    """Start tunnel as a proper context manager."""
+    """Start tunnel as a proper context manager. Yields tunnel URL."""
     _wait_for_server()
     from app.utils.tunnel import TunnelManager
 
-    with TunnelManager(port=8000) as tm:
-        logger.info("Tunnel started: %s", tm.tunnel_url)
-        yield tm
+    with TunnelManager(port=8000) as tunnel_url:
+        logger.info("Tunnel started: %s", tunnel_url)
+        yield tunnel_url
 
 
 def _setup_console_capture(page):
@@ -317,9 +317,9 @@ def e2e_page_with_real_audio(browser_context, request, base_url, real_audio_byte
     test_mode = _get_test_mode(request)
 
     if test_mode == "tunnel":
-        with _start_tunnel() as tunnel_manager:
+        with _start_tunnel() as tunnel_url:
             yield from _run_e2e_page(
-                browser_context, tunnel_manager.tunnel_url, 15000, real_audio_bytes
+                browser_context, tunnel_url, 15000, real_audio_bytes
             )
     else:
         yield from _run_e2e_page(browser_context, base_url, 10000, real_audio_bytes)

@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -78,8 +79,11 @@ def _validate_webm_header(audio_data: bytes) -> bool:
 def _validate_audio_file(file: UploadFile, audio_data: bytes) -> None:
     """Validate audio file format and size"""
     # iOS Safari may send audio/mp4 instead of audio/webm
+    # iOS Safari quirk: content-type includes codecs param
+    # e.g., "audio/mp4; codecs=mp4a.40.2"
     valid_types = ["audio/webm", "audio/mp4", "audio/wav", "audio/mpeg"]
-    if file.content_type not in valid_types:
+    content_type_base = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type_base not in valid_types:
         logger.warning(f"Unsupported format: {file.content_type}")
         raise HTTPException(status_code=400, detail="Unsupported audio format")
 
@@ -133,15 +137,17 @@ async def process_audio(
     file: UploadFile = File(...),  # noqa: B008 - FastAPI standard pattern
     background_tasks=None,
 ):
+    correlation_id = str(uuid.uuid4())[:8]
     session_id = "anonymous"
     session_hash = hashlib.sha256(session_id.encode()).hexdigest()[:8]
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    logger.info(f"[{ts}] Request session={session_hash}")
+    logger.info(f"[{ts}] [{correlation_id}] Request session={session_hash}")
 
     audio_data = await file.read()
+    logger.info(
+        f"[{correlation_id}] Received {len(audio_data)} bytes, type={file.content_type}"
+    )
     _validate_audio_file(file, audio_data)
-
-    logger.debug(f"[{ts}] Received {len(audio_data)} bytes, type={file.content_type}")
 
     tts_path = None
     try:
